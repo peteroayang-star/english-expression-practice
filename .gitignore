@@ -1,0 +1,7 @@
+server.log
+.claude/
+.codegraph/
+.cursor/
+*.png
+shot_*.html
+dom.txt

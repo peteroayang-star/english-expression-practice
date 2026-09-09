@@ -1,0 +1,2040 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>英语表达练习器</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+  }
+  .card {
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    padding: 32px;
+    width: 100%;
+    max-width: 640px;
+  }
+  h1 { font-size: 22px; color: #333; text-align: center; margin-bottom: 6px; }
+  .sub { text-align: center; color: #999; font-size: 13px; margin-bottom: 20px; }
+  .tag {
+    display: inline-block; border-radius: 999px;
+    font-size: 12px; padding: 2px 10px; margin-left: 6px; vertical-align: middle;
+  }
+  #modeTag.demo { background: #fff7e6; color: #d48806; border: 1px solid #ffd591; }
+  #modeTag.online { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+
+  .settings-toggle {
+    text-align: right; margin-bottom: 14px;
+  }
+  #toggleSettings {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: #fff; color: #5a6178; font-size: 13px; cursor: pointer;
+    padding: 7px 14px; border-radius: 999px;
+    border: 1px solid #e3e6f2; box-shadow: 0 1px 3px rgba(60,70,160,.06);
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  #toggleSettings:hover { border-color: #c9d1f0; color: #667eea; background: #f7f8ff; }
+  /* —— 设置弹窗（左侧 Tab 导航） —— */
+  #settings {
+    display: none; position: fixed; inset: 0; z-index: 100;
+    background: rgba(24, 28, 48, .48); backdrop-filter: blur(3px);
+    padding: 24px; overflow-y: auto;
+  }
+  #settings.open { display: flex; align-items: center; justify-content: center; }
+
+  .settings-box {
+    width: 100%; max-width: 760px;
+    height: min(640px, calc(100vh - 48px));
+    background: #fff; border-radius: 16px; overflow: hidden;
+    box-shadow: 0 24px 70px rgba(24, 20, 60, .35);
+    display: flex; animation: popIn .16s ease;
+  }
+  @keyframes popIn {
+    from { transform: translateY(10px) scale(.985); opacity: 0; }
+    to   { transform: none; opacity: 1; }
+  }
+  .settings-nav {
+    flex: 0 0 170px; background: #f6f7fc; border-right: 1px solid #e9ebf3;
+    padding: 16px 10px; display: flex; flex-direction: column; gap: 2px;
+  }
+  .st-tab {
+    display: flex; align-items: center; gap: 10px;
+    border: none; background: transparent; border-radius: 9px;
+    padding: 10px 12px; font-size: 14px; color: #5a6072;
+    cursor: pointer; text-align: left; font-family: inherit;
+    transition: background .15s, color .15s;
+  }
+  .st-tab .st-ico { width: 20px; text-align: center; font-size: 15px; }
+  .st-tab:hover { background: #ebedf6; color: #2b3150; }
+  .st-tab.active {
+    background: #fff; color: #667eea; font-weight: 600;
+    box-shadow: 0 1px 5px rgba(80, 95, 180, .14);
+  }
+
+  .settings-body { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .settings-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 22px 12px; border-bottom: 1px solid #eef0f6;
+    flex: 0 0 auto;
+  }
+  .cfg-title { font-size: 15px; font-weight: 600; color: #1f2430; }
+  .cfg-sub { font-size: 12px; color: #9aa0b0; margin-top: 3px; }
+  .settings-head .cfg-title { font-size: 17px; }
+  #closeSettings {
+    border: none; background: #f0f1f7; color: #7b8196;
+    width: 30px; height: 30px; border-radius: 50%; cursor: pointer;
+    font-size: 16px; line-height: 1; flex: 0 0 auto;
+  }
+  #closeSettings:hover { background: #e4e6f0; color: #4a5070; }
+
+  .pane-wrap { flex: 1; overflow-y: auto; padding: 20px 24px 24px; }
+  .pane { display: none; }
+  .pane.active { display: block; }
+  .pane-title { font-size: 16px; font-weight: 600; color: #222840; }
+  .pane-sub { font-size: 12.5px; color: #9499ab; margin: 4px 0 18px; line-height: 1.6; }
+
+  .cfg-field { margin-bottom: 16px; }
+  .cfg-label {
+    display: block; font-size: 12.5px; color: #565d72; margin-bottom: 7px;
+    font-weight: 600;
+  }
+  .cfg-controls { display: flex; gap: 8px; align-items: stretch; }
+  .cfg-controls > .cfg-input, .cfg-controls > .input-with-eye { flex: 1; min-width: 0; width: auto; }
+  .cfg-input, .cfg-select {
+    width: 100%; border: 1px solid #dfe3ee; border-radius: 9px; padding: 9px 12px;
+    font-size: 14px; color: #333; background: #fff; outline: none;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .cfg-input:focus, .cfg-select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,.14); }
+  .input-with-eye { position: relative; display: flex; align-items: center; }
+  .input-with-eye .cfg-input { padding-right: 60px; }
+  .eye-btn {
+    position: absolute; right: 6px; border: none; background: none; color: #8a90a6;
+    font-size: 12px; cursor: pointer; padding: 6px 8px; border-radius: 6px;
+  }
+  .eye-btn:hover { background: #f0f2fa; color: #667eea; }
+
+  /* 主按钮：保存 */
+  .btn-primary {
+    flex: 0 0 auto; background: #667eea; color: #fff; border: none;
+    border-radius: 9px; padding: 9px 20px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; transition: background .15s, transform .05s;
+    white-space: nowrap;
+  }
+  .btn-primary:hover { background: #5a72e2; }
+  .btn-primary:active { transform: scale(.98); }
+
+  /* 次要按钮 */
+  .btn-outline {
+    background: #fff; color: #667eea; border: 1px solid #cdd4f2;
+    border-radius: 9px; padding: 7px 12px; font-size: 12.5px; cursor: pointer;
+    transition: background .15s, border-color .15s; white-space: nowrap;
+  }
+  .btn-outline:hover { background: #f0f3ff; border-color: #aeb9e8; }
+  .btn-outline:disabled { opacity: .55; cursor: not-allowed; }
+
+  /* 连接状态卡片 */
+  .conn-card {
+    display: flex; align-items: center; gap: 12px;
+    background: linear-gradient(135deg, #f5f6fe, #eef1fd);
+    border: 1px solid #e1e6fb; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 18px;
+  }
+  .conn-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #c7cbd8; flex: 0 0 auto;
+  }
+  .conn-card.ready .conn-dot { background: #667eea; box-shadow: 0 0 0 4px rgba(102,126,234,.16); }
+  .conn-card.ok .conn-dot { background: #52c41a; box-shadow: 0 0 0 4px rgba(82,196,26,.16); }
+  .conn-card.err .conn-dot { background: #ff4d4f; box-shadow: 0 0 0 4px rgba(255,77,79,.14); }
+  .conn-card.testing .conn-dot { background: #667eea; animation: dotPulse 1s ease infinite; }
+  @keyframes dotPulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(102,126,234,.22); }
+    50% { box-shadow: 0 0 0 7px rgba(102,126,234,.05); }
+  }
+  .conn-info { flex: 1; min-width: 0; }
+  .conn-title { font-size: 14px; font-weight: 600; color: #232c5c; }
+  .conn-desc { font-size: 12px; color: #79839f; margin-top: 3px; line-height: 1.5; }
+  .conn-card .btn-outline { flex: 0 0 auto; }
+
+  /* Key 保存状态反馈 */
+  .key-feedback { margin: 8px 0 0; min-height: 18px; }
+  .save-status { font-size: 12px; }
+  .save-status .mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  }
+  .save-status.saved { color: #389e0d; }
+  .save-status.unsaved { color: #b6bac7; }
+  .save-status.saved-flash {
+    display: inline-block; animation: statusFlash .6s ease-in-out 2;
+  }
+  @keyframes statusFlash {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .35; }
+  }
+
+  #modelsOut {
+    font-size: 12px; color: #9aa0b0; margin: 8px 0 2px; line-height: 1.5;
+  }
+  #modelsOut.ok { color: #389e0d; }
+  #modelsOut.err { color: #cf1322; }
+
+  /* 设置分组卡片 */
+  .pref-card {
+    background: #fff; border: 1px solid #e8ebf4; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 12px;
+  }
+  .pref-head { font-size: 13px; font-weight: 600; color: #3f465c; margin-bottom: 2px; }
+  .seg { display: flex; background: #f0f1f7; border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button {
+    flex: 1; border: none; background: transparent; border-radius: 8px;
+    padding: 8px 6px; font-size: 13px; color: #6b7080; cursor: pointer;
+    font-family: inherit; transition: all .15s;
+  }
+  .seg button.active {
+    background: #fff; color: #667eea; font-weight: 600;
+    box-shadow: 0 1px 4px rgba(50, 60, 150, .13);
+  }
+  .pref-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 9px; }
+  .pref-row input[type="checkbox"] {
+    margin-top: 2px; width: 16px; height: 16px; accent-color: #667eea; flex: 0 0 auto;
+  }
+  .pref-text { font-size: 13px; color: #4a4f5c; line-height: 1.55; }
+  .pref-text small { display: block; font-size: 12px; color: #9aa0b0; margin-top: 2px; line-height: 1.5; }
+
+  /* 高级设置（折叠） */
+  details.cfg-adv { border-top: 1px dashed #e2e5f0; margin-top: 18px; padding-top: 13px; }
+  details.cfg-adv > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    font-size: 12.5px; color: #7b8296; display: flex; align-items: center;
+    gap: 5px; padding: 2px 0; font-weight: 600;
+  }
+  details.cfg-adv > summary::-webkit-details-marker { display: none; }
+  details.cfg-adv > summary .adv-arrow {
+    display: inline-block; transition: transform .18s; font-size: 10px;
+  }
+  details.cfg-adv[open] > summary .adv-arrow { transform: rotate(90deg); }
+  details.cfg-adv > summary:hover { color: #667eea; }
+  .adv-body { margin-top: 12px; }
+
+  /* 帮助提示条 */
+  .cfg-callout {
+    display: flex; gap: 8px; align-items: flex-start;
+    background: #f7f9ff; border: 1px solid #e2e8fb; border-radius: 10px;
+    color: #6673a0; font-size: 12px; line-height: 1.65; padding: 10px 13px;
+    margin: 4px 0 0;
+  }
+  .cfg-callout b { color: #4a5ca8; }
+
+  .hint { font-size: 12px; color: #a8adb8; margin-top: 6px; line-height: 1.5; }
+
+  /* 声音提示条（页面底部） */
+  #voiceToast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%);
+    max-width: min(540px, calc(100vw - 40px));
+    background: rgba(35, 40, 70, .95); color: #fff; font-size: 13px;
+    line-height: 1.6; padding: 12px 18px; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(20, 20, 50, .3);
+    opacity: 0; pointer-events: none; transition: opacity .25s;
+    z-index: 200; text-align: center;
+  }
+  #voiceToast.show { opacity: 1; }
+
+  /* 语音检测结果卡片 */
+  .voice-check {
+    border-radius: 10px; font-size: 12.5px; line-height: 1.7;
+    padding: 10px 13px; margin-bottom: 16px;
+  }
+  .voice-check.ok { background: #f6ffed; border: 1px solid #d9f7be; color: #3c8618; }
+  .voice-check.null { background: #fff2f0; border: 1px solid #ffd6d2; color: #b23b36; }
+  .voice-check small { display: block; margin-top: 4px; opacity: .85; }
+
+  /* 手机端：导航改为顶部横排 */
+  @media (max-width: 640px) {
+    #settings { padding: 0; }
+    .settings-box {
+      height: 100vh; height: 100dvh; max-height: none;
+      border-radius: 0; flex-direction: column;
+    }
+    .settings-nav {
+      flex: 0 0 auto; flex-direction: row; overflow-x: auto;
+      padding: 8px 10px; border-right: none; border-bottom: 1px solid #e9ebf3;
+      gap: 4px;
+    }
+    .st-tab { flex: 0 0 auto; padding: 9px 13px; font-size: 13px; white-space: nowrap; }
+    .settings-head { padding: 14px 16px 10px; }
+    .pane-wrap { padding: 16px 16px 20px; }
+  }
+
+  .hint { font-size: 12px; color: #bbb; margin-top: 4px; }
+
+  textarea {
+    width: 100%; height: 90px; border: 2px solid #e8e8e8; border-radius: 10px;
+    padding: 12px; font-size: 16px; resize: none; outline: none;
+    transition: border-color .2s;
+  }
+  textarea:focus { border-color: #667eea; }
+  .row { display: flex; gap: 10px; margin-top: 12px; }
+  #go {
+    width: 100%; background: #667eea; color: #fff; font-weight: bold;
+    border: none; border-radius: 10px; padding: 12px; font-size: 16px;
+    cursor: pointer; transition: opacity .2s;
+  }
+  #go:disabled { opacity: .5; cursor: not-allowed; }
+  button.example { background: #f5f5f5; color: #555; font-size: 13px; padding: 8px; flex: 0 0 auto; border: none; border-radius: 6px; cursor: pointer; }
+  button.example:hover { background: #e8e8e8; }
+  .examples-wrap { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
+  .examples { display: flex; gap: 8px; overflow-x: auto; flex: 1; padding-bottom: 4px; }
+  #shuffleEx {
+    flex: 0 0 auto; background: #f0f0f5; color: #667eea; border: none;
+    border-radius: 999px; padding: 8px 14px; font-size: 12px; cursor: pointer;
+    white-space: nowrap; position: relative; z-index: 10;
+  }
+  #shuffleEx:hover { background: #e2e2ef; }
+  .results { margin-top: 60px; }
+  .result {
+    background: #fafafa; border: 1px solid #eee; border-left: 4px solid #667eea;
+    border-radius: 10px; padding: 14px; margin-bottom: 12px;
+  }
+  .result.lv-simple { border-left-color: #667eea; }
+  .result.lv-natural { border-left-color: #52c41a; }
+  .result.lv-native { border-left-color: #fa8c16; }
+  .result.lv-replace { border-left-color: #13c2c2; background: #f7fffd; }
+  .result.lv-mistake { border-left-color: #ff4d4f; background: #fffcfc; }
+  .result.lv-scene { border-left-color: #8c8c8c; background: #fcfcfc; }
+  .m-line { display: flex; align-items: center; gap: 6px; padding: 5px 0; font-size: 15px; line-height: 1.5; }
+  .m-line.bad { color: #cf1322; }
+  .m-line .ok { color: #389e0d; font-weight: 600; }
+  .m-line .speak { margin-left: auto; width: 22px; height: 22px; color: #bbb; }
+  .m-line .speak svg { width: 13px; height: 13px; }
+  .m-line .speak:hover { color: #389e0d; background: #f6ffed; }
+  .scene-text { font-size: 14px; color: #666; margin-top: 8px; line-height: 1.7; }
+  .tag { font-size: 12px; color: #888; font-weight: bold; }
+  .result-head { display: flex; align-items: center; justify-content: space-between; }
+  .speak {
+    flex: 0 0 auto; background: none; border: none; cursor: pointer; color: #999;
+    padding: 6px; border-radius: 50%; display: inline-flex;
+    align-items: center; justify-content: center; width: 28px; height: 28px;
+  }
+  .speak:hover { color: #667eea; background: #f0f0f5; }
+  .speak svg { width: 15px; height: 15px; }
+  .en { font-size: 18px; color: #222; margin-top: 6px; line-height: 1.5; }
+  .en .english { color: #667eea; font-weight: bold; }
+  .zh { font-size: 14px; color: #888; margin-top: 2px; }
+  .result.def { border-left-color: #722ed1; background: #fbfaff; }
+  .en .blank {
+    background: #fff1b8; color: #ad6800; border-radius: 4px; padding: 0 5px;
+    font-weight: bold;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chip {
+    flex: 0 0 auto; background: #fff; border: 1px solid #13c2c2; color: #08979c;
+    border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer;
+  }
+  .chip:hover { background: #e6fffb; }
+  .loading { text-align: center; color: #999; padding: 20px; display: none; }
+  .loading.show { display: block; }
+  #errorBox {
+    display: none; background: #fff2f0; border: 1px solid #ffccc7; color: #cf1322;
+    border-radius: 10px; padding: 12px; font-size: 13px; margin-top: 12px;
+  }
+  #errorBox.show { display: block; }
+  .demo-note { text-align: center; color: #bbb; font-size: 12px; margin-top: 14px; }
+
+  /* 练习模式切换 */
+  .mode-selector {
+    display: flex; gap: 8px; margin-bottom: 16px; justify-content: center;
+    position: relative; z-index: 10;
+  }
+  .mode-btn {
+    flex: 1; max-width: 150px; background: #f5f5f5; color: #666; border: 2px solid #e8e8e8;
+    border-radius: 10px; padding: 10px 16px; font-size: 14px; cursor: pointer;
+    transition: all .2s; position: relative; z-index: 11;
+  }
+  .mode-btn:hover { background: #ebebeb; }
+  .mode-btn.active {
+    background: #667eea; color: #fff; border-color: #667eea; font-weight: bold;
+  }
+
+  /* 练习题界面 */
+  .quiz-container { display: none; }
+  .quiz-container.show { display: block; }
+  .quiz-question {
+    background: #f8f9fa; border: 2px solid #e8e8e8; border-radius: 12px;
+    padding: 20px; margin-bottom: 20px; text-align: center;
+  }
+  .quiz-question .zh-text {
+    font-size: 20px; color: #333; margin-bottom: 8px; font-weight: 500;
+  }
+  .quiz-question .hint { font-size: 13px; color: #999; }
+  .quiz-options {
+    display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;
+  }
+  .quiz-option {
+    background: #fff; border: 2px solid #e8e8e8; border-radius: 10px;
+    padding: 14px 18px; font-size: 16px; text-align: left; cursor: pointer;
+    transition: all .2s;
+  }
+  .quiz-option:hover { border-color: #667eea; background: #f8f9ff; }
+  .quiz-option.correct {
+    background: #f6ffed; border-color: #52c41a; color: #389e0d;
+    font-weight: bold; pointer-events: none;
+  }
+  .quiz-option.wrong {
+    background: #fff2f0; border-color: #ff4d4f; color: #cf1322;
+    pointer-events: none;
+  }
+  .quiz-option.disabled { pointer-events: none; opacity: 0.6; }
+  .quiz-feedback {
+    display: none; padding: 16px; border-radius: 10px; margin-bottom: 16px;
+    font-size: 15px; text-align: center;
+  }
+  .quiz-feedback.show { display: block; }
+  .quiz-feedback.correct-fb {
+    background: #f6ffed; border: 2px solid #52c41a; color: #389e0d;
+  }
+  .quiz-feedback.wrong-fb {
+    background: #fff2f0; border: 2px solid #ff4d4f; color: #cf1322;
+  }
+  .quiz-feedback .answer { font-weight: bold; margin-top: 8px; }
+  .quiz-controls {
+    display: flex; gap: 10px; justify-content: center;
+  }
+  .quiz-controls button {
+    flex: 0 0 auto; min-width: 120px; border: none; border-radius: 10px;
+    padding: 12px 20px; font-size: 16px; cursor: pointer; transition: opacity .2s;
+  }
+  #choiceNext, #blankNext {
+    background: #667eea; color: #fff; font-weight: bold;
+  }
+  #choiceCustom, #blankCustom {
+    background: #f5f5f5; color: #666;
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>英语表达练习器<span id="modeTag" class="tag demo">演示模式</span></h1>
+    <p class="sub">输入一句中文：给出 基础表达 / 更自然的说法 / 地道表达 + 常见错误 + 使用场景；输入单词：查词造句</p>
+
+    <!-- 练习模式切换 -->
+    <div class="mode-selector">
+      <button class="mode-btn active" data-mode="view">查看模式</button>
+      <button class="mode-btn" data-mode="choice">选择题</button>
+      <button class="mode-btn" data-mode="blank">填空题</button>
+    </div>
+
+    <div class="settings-toggle"><button id="toggleSettings">⚙ 设置</button></div>
+
+    <!-- 设置弹窗：左侧 Tab 导航，右侧内容区 -->
+    <div id="settings">
+      <div class="settings-box">
+        <nav class="settings-nav">
+          <button type="button" class="st-tab active" data-pane="conn"><span class="st-ico">🔗</span>AI 连接</button>
+          <button type="button" class="st-tab" data-pane="model"><span class="st-ico">🧠</span>模型设置</button>
+          <button type="button" class="st-tab" data-pane="voice"><span class="st-ico">🔊</span>语音设置</button>
+          <button type="button" class="st-tab" data-pane="study"><span class="st-ico">🎯</span>学习设置</button>
+        </nav>
+
+        <div class="settings-body">
+          <header class="settings-head">
+            <div>
+              <div class="cfg-title">设置</div>
+              <div class="cfg-sub">所有内容只保存在本机浏览器，不会上传</div>
+            </div>
+            <button type="button" id="closeSettings" title="关闭">✕</button>
+          </header>
+
+          <div class="pane-wrap">
+            <!-- ① AI 连接 -->
+            <section class="pane active" id="pane-conn">
+              <div class="pane-title">AI 连接</div>
+              <p class="pane-sub">填好密钥后，练习器会用真实 AI 为你生成表达、纠正错误；不填则用内置示例（演示模式）。</p>
+
+              <div class="conn-card" id="connCard">
+                <span class="conn-dot"></span>
+                <div class="conn-info">
+                  <div class="conn-title" id="connTitle">未连接</div>
+                  <div class="conn-desc" id="connDesc"></div>
+                </div>
+                <button type="button" id="testBtn" class="btn-outline">测试连接</button>
+              </div>
+
+              <div class="cfg-field">
+                <label class="cfg-label" for="apiKey">AI 密钥（API Key）</label>
+                <div class="cfg-controls">
+                  <div class="input-with-eye">
+                    <input type="password" id="apiKey" class="cfg-input" placeholder="sk-..." autocomplete="off">
+                    <button type="button" id="toggleKeyView" class="eye-btn" title="显示/隐藏密钥">显示</button>
+                  </div>
+                  <button id="saveKey" class="btn-primary">保存</button>
+                </div>
+                <div class="key-feedback"><span id="keyStatus" class="save-status"></span></div>
+              </div>
+
+              <div class="cfg-callout">
+                <span>💡</span>
+                <span>密钥在 <b>platform.deepseek.com</b> 申请。使用第三方 AI 服务时，在下方「高级设置」里填写对应的接口地址。</span>
+              </div>
+
+              <details class="cfg-adv">
+                <summary><span class="adv-arrow">▶</span>高级设置：接口地址</summary>
+                <div class="adv-body">
+                  <div class="cfg-field">
+                    <label class="cfg-label" for="apiUrl">接口地址</label>
+                    <input type="text" id="apiUrl" class="cfg-input"
+                           placeholder="https://www.zirocode.com/deepseek/plus/chat/completions"
+                           autocomplete="off">
+                    <div class="hint">一般保持默认即可。只有使用第三方 AI 服务时，才需要改成它提供的地址。</div>
+                  </div>
+                </div>
+              </details>
+            </section>
+
+            <!-- ② 模型设置 -->
+            <section class="pane" id="pane-model">
+              <div class="pane-title">模型设置</div>
+              <p class="pane-sub">选择背后帮你生成表达的 AI 助手。日常使用推荐「deepseek-v4-flash」。</p>
+
+              <div class="cfg-field">
+                <label class="cfg-label" for="model">使用的 AI 助手</label>
+                <select id="model" class="cfg-select">
+                  <option value="deepseek-v4-flash" selected>deepseek-v4-flash（V4 快速版，推荐）</option>
+                  <option value="deepseek-v4-pro">deepseek-v4-pro（V4 旗舰）</option>
+                  <option value="deepseek-chat">deepseek-chat（旧版，部分站已下架）</option>
+                </select>
+                <div class="cfg-controls" style="margin-top:10px;">
+                  <button id="listModels" class="btn-outline">🔍 查看这个站点有哪些可用模型</button>
+                </div>
+                <div id="modelsOut"></div>
+              </div>
+            </section>
+
+            <!-- ③ 语音设置 -->
+            <section class="pane" id="pane-voice">
+              <div class="pane-title">语音设置</div>
+              <p class="pane-sub">例句、单词和答题结果都能点 🔊 朗读，这里调整朗读的方式。</p>
+
+              <div id="voiceInfo" class="voice-check"></div>
+
+              <div class="pref-card">
+                <div class="pref-head">朗读语速</div>
+                <div class="seg" id="rateSeg">
+                  <button type="button" data-rate="slow">慢速</button>
+                  <button type="button" data-rate="normal" class="active">标准</button>
+                  <button type="button" data-rate="fast">快速</button>
+                </div>
+                <div class="hint">点击即可试听。慢速适合跟读练习。</div>
+              </div>
+
+              <div class="pref-card">
+                <div class="pref-head">自动朗读</div>
+                <label class="pref-row" for="autoSpeak">
+                  <input type="checkbox" id="autoSpeak">
+                  <span class="pref-text">生成结果后自动朗读
+                    <small>自动先读「基础表达 / 基础例句」；想听哪一句，随时点句子旁的 🔊。</small>
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <!-- ④ 学习设置 -->
+            <section class="pane" id="pane-study">
+              <div class="pane-title">学习设置</div>
+              <p class="pane-sub">按你的使用习惯调整练习方式。</p>
+
+              <div class="pref-card">
+                <div class="pref-head">练习位置</div>
+                <label class="pref-row" for="rememberMode">
+                  <input type="checkbox" id="rememberMode">
+                  <span class="pref-text">记住上次的练习模式
+                    <small>开启后，下次打开会停留在你上次用的模式：查看表达 / 选择题 / 填空题。</small>
+                  </span>
+                </label>
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 朗读提示（无语音/朗读失败时显示在页面底部） -->
+    <div id="voiceToast" role="status"></div>
+
+    <!-- 查看模式 (原有界面) -->
+    <div id="viewMode" class="view-mode">
+      <textarea id="input" placeholder="请输入一句中文，例如：我想吃一个橘子"></textarea>
+
+      <div class="row">
+        <button id="go">生成表达</button>
+      </div>
+      <div class="examples-wrap">
+        <div class="examples" id="examplesBox"></div>
+        <button id="shuffleEx" title="换一批示例">换一批</button>
+      </div>
+
+      <div id="loading" class="loading">思考中… DeepSeek 正在按教练模式组织内容</div>
+
+      <div id="results"></div>
+      <div id="errorBox"></div>
+
+      <p class="demo-note" id="demoNote"></p>
+    </div>
+
+    <!-- 选择题模式 -->
+    <div id="choiceMode" class="quiz-container">
+      <div class="quiz-question">
+        <div class="zh-text" id="choiceQuestion">请选择正确的英文表达</div>
+        <div class="hint">从下面四个选项中选择最合适的表达</div>
+      </div>
+      <div class="quiz-options" id="choiceOptions"></div>
+      <div class="quiz-feedback" id="choiceFeedback"></div>
+      <div class="quiz-controls">
+        <button id="choiceNext">下一题</button>
+        <button id="choiceCustom" style="background:#f5f5f5;color:#666;">自定义题目</button>
+      </div>
+    </div>
+
+    <!-- 填空题模式 -->
+    <div id="blankMode" class="quiz-container">
+      <div class="quiz-question">
+        <div class="zh-text" id="blankQuestion">选择正确的词填入空位</div>
+        <div class="hint" id="blankSentence" style="font-size:18px;color:#667eea;font-weight:bold;margin-top:12px;">I ___ an orange.</div>
+      </div>
+      <div class="quiz-options" id="blankOptions"></div>
+      <div class="quiz-feedback" id="blankFeedback"></div>
+      <div class="quiz-controls">
+        <button id="blankNext">下一题</button>
+        <button id="blankCustom" style="background:#f5f5f5;color:#666;">自定义题目</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+// baseUrl：默认填中转站 zirocode 的完整请求地址；
+// 仅当填写官方地址（api.deepseek.com）或以 /v1 结尾的基础地址时自动补 /chat/completions
+const CFG = {
+  key: localStorage.getItem("ds_key") || "",
+  baseUrl: localStorage.getItem("ds_url") || "https://www.zirocode.com/deepseek/plus/chat/completions",
+  model: localStorage.getItem("ds_model") || "deepseek-v4-flash",
+  mode: localStorage.getItem("practice_mode") || "view",  // 练习模式：view/choice/blank
+  rememberMode: localStorage.getItem("ds_remember_mode") === "1",  // 是否记住上次练习模式（默认关）
+  speakRate: localStorage.getItem("ds_speak_rate") || "normal",    // 朗读语速：slow/normal/fast
+  autoSpeak: localStorage.getItem("ds_auto_speak") === "1"         // 生成结果后自动朗读（默认关）
+};
+if (!CFG.rememberMode) CFG.mode = "view";  // 未开启「记住模式」时，一律从查看模式开始
+// 旧模型 ID（deepseek-chat / deepseek-reasoner）已在官方退役，
+// 若 localStorage 存的是旧值则自动重置为新默认，避免中转站向上游转发时 404
+if (CFG.model === "deepseek-chat" || CFG.model === "deepseek-reasoner") {
+  CFG.model = "deepseek-v4-flash";
+}
+// 旧地址（不带 /chat/completions 的直发路径）→ 自动修正为带接口路径的标准拼法
+if (CFG.baseUrl === "https://www.zirocode.com/deepseek/plus") {
+  CFG.baseUrl = "https://www.zirocode.com/deepseek/plus/chat/completions";
+}
+
+function apiEndpoint() {
+  let u = (CFG.baseUrl || "").trim() || "https://api.deepseek.com";
+  u = u.replace(/\/+$/, "");                     // 去掉末尾斜杠
+  if (/^https?:\/\/api\.deepseek\.com$/i.test(u) || /\/v1$/i.test(u)) {
+    return u + "/chat/completions";              // 官方基础地址：补全接口路径
+  }
+  return u;                                      // 其他地址（含中转站完整接口）原样使用
+}
+
+// ================= 运行时缓存 =================
+const cache = new Map(); // key: "text|isWord", value: {result, timestamp}
+const CACHE_TTL = 10 * 60 * 1000; // 缓存有效期 10 分钟
+
+function getCacheKey(text, isWord) {
+  return `${text.trim()}|${isWord}`;
+}
+
+function getCache(text, isWord) {
+  const key = getCacheKey(text, isWord);
+  const cached = cache.get(key);
+  if (!cached) return null;
+
+  // 检查是否过期
+  if (Date.now() - cached.timestamp > CACHE_TTL) {
+    cache.delete(key);
+    return null;
+  }
+
+  return cached.result;
+}
+
+function setCache(text, isWord, result) {
+  const key = getCacheKey(text, isWord);
+  cache.set(key, {
+    result: result,
+    timestamp: Date.now()
+  });
+}
+
+// ================= 翻译（真实 DeepSeek API）=================
+// 整句输入：按新版「五段式教练」输出（基础/自然/地道 + 常见错误 + 使用场景）
+const SENT_PROMPT = `你是一位英语母语教练，同时很了解中国人说英语的常见错误。
+用户输入一句中文，请按下面 5 个板块输出（顺序固定）：
+1. 基础表达：直译，最直白简单；
+2. 更自然的说法：更像日常口语；
+3. 地道表达：母语者真正会用的说法，可用习语；
+4. 常见错误：中国人最容易说错的一个句子 + 正确版本（形式：错误句和正确句各一句，成对给出）；
+5. 使用场景：这句话一般用在什么场合（用一句中文说明）。
+
+要求：所有表达必须真实存在、能直接开口说；避免教科书英语；句子简短；不要解释任何语法；绝对不能出现中式英语。
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹，不要输出任何解释或多余文字：
+{"list":[
+  {"kind":"simple","en":"I want to eat an orange."},
+  {"kind":"natural","en":"I'd like to have an orange."},
+  {"kind":"native","en":"I'm craving an orange right now."}],
+ "mistake":{"wrong":"I want to eat orange.","right":"I want to eat an orange."},
+ "scene":"想跟家人朋友说想吃什么，或点餐时说。"}
+
+字段规则：
+- list：三个例句，kind 只能各取 simple / natural / native 一条，顺序固定 simple → natural → native。例句正文里不要出现 ❌ ✅ ⭐ 等任何符号。
+- mistake：常见错误。wrong 是中国人容易说错的中式句子，right 是正确说法。可给 1 组；确实有必要时可给 2 组（用数组）。
+- scene：使用场景，用中文一句话说明。`;
+
+// 单词输入：保持原查词模式（释义 + 三级例句 + 可替换词）
+const WORD_PROMPT = `你是一位英语表达教练，帮助中国人学单词并会用它造句。
+用户输入一个中文词或英文词。请输出固定三部分：① 单词释义 ② 围绕该词的三级例句 ③ 可替换词。
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹，不要输出任何解释或多余文字：
+{"word":"apple","definition":"n. 苹果","list":[
+  {"kind":"simple","en":"I eat an apple every day."},
+  {"kind":"natural","en":"Want an apple? They're really sweet."},
+  {"kind":"native","en":"An apple a day keeps the doctor away."}],
+ "replace":{"pattern":"I eat an ___ every day.","zh":"我每天吃一个…","words":["apple","orange","egg"]}}
+
+字段规则：
+1) word：输入中文词时给对应英文词；输入英文词时照填。definition 写「词性 + 中文解释」。
+2) list（三级例句）：kind 只能各取 simple / natural / native 一条，顺序固定 simple → natural → native：
+   - simple 基础例句：最简单的直译，短而清楚；
+   - natural 自然例句：日常口语，更自然；
+   - native 地道例句：母语者真的会说的说法，可用习语。
+   例句围绕该词展开，必须真实、自然、简短，绝对无中式英语。
+3) replace（可替换词）：pattern 是带一个空位 ___（英文三个下划线）的句子，可从上面例句改编；zh 是该句中文意思；words 给 2~4 个能填进空位的关键词（同义词或同类词）。
+
+例句正文里不要出现任何标注符号，只输出 JSON。`;
+
+// 选择题模式：生成 1 个正确答案 + 3 个干扰项
+const CHOICE_PROMPT = `你是一位英语表达教练。用户输入一句中文，请生成一道选择题：
+1 个正确的英文表达 + 3 个错误的干扰项（常见中式英语错误）。
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"question":"我想吃一个橘子","correct":"I'd like to have an orange.","options":["I want to eat orange.","I want eating an orange.","I'm wanting eat orange."]}
+
+字段规则：
+- question: 中文原句
+- correct: 正确的地道英文表达（自然口语，非直译）
+- options: 3 个错误选项（必须是中国人容易说错的句子，有明显语法或用词错误）
+
+只输出 JSON，不要解释。`;
+
+// 填空题模式：挖空一个关键词，给 3-4 个选项（1 对 2-3 错）
+const BLANK_PROMPT = `你是一位英语表达教练。用户输入一句中文，请生成一道填空题：
+挖空句子中的一个关键词（用 ___ 表示），给出 1 个正确选项 + 2-3 个干扰项。
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"question":"我想吃一个橘子","sentence":"I'd like to ___ an orange.","correct":"have","options":["eat","get","take"],"zh":"(提示：表达"想要"的意思)"}
+
+字段规则：
+- question: 中文原句
+- sentence: 挖空后的英文句子（用 ___ 表示空位，只挖 1 个关键词）
+- correct: 正确答案（单个词或短语）
+- options: 2-3 个干扰项（语法正确但语境不自然，或搭配不当）
+- zh: 可选的中文提示
+
+只输出 JSON，不要解释。`;
+
+const KIND_TAG = { simple: "基础例句", natural: "自然例句", native: "地道例句" };  // 查词模式的标签
+const SENT_TAG = { simple: "基础表达", natural: "更自然的说法", native: "地道表达" }; // 整句模式的标签
+const KIND_ORDER = ["simple", "natural", "native"];
+
+// 单词查询判断：纯中文 1~4 字或纯英文词（无标点、无空格）
+function isWordQuery(t) {
+  const s = (t || "").trim();
+  if (!s || /[。！？，,.!?;；:：、·\s]/.test(s)) return false;
+  if (/^[\u4e00-\u9fa5]{1,4}$/.test(s)) return true;   // 如：苹果
+  if (/^[a-zA-Z]{2,15}$/.test(s)) return true;         // 如：apple
+  return false;
+}
+
+// 通过本地服务（server.py / start.bat）打开页面时 → 请求走同源 /api 代理，绕过跨域限制
+const VIA_PROXY = location.protocol.startsWith("http") &&
+                  /^(localhost|127\.0\.0\.1|\[::1\])/i.test(location.hostname);
+
+// 调用 DeepSeek API（通用函数）
+async function callDeepSeekAPI(systemPrompt, userText) {
+  const target = VIA_PROXY ? "/api" : apiEndpoint();
+  const headers = {
+    "Content-Type": "application/json",
+    "Authorization": "Bearer " + CFG.key
+  };
+  if (VIA_PROXY) headers["X-Upstream-URL"] = apiEndpoint();
+
+  const res = await fetch(target, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: CFG.model,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userText }
+      ],
+      temperature: 1.3,
+      stream: false
+    })
+  });
+
+  if (!res.ok) {
+    let msg = "HTTP " + res.status;
+    let code = "";
+    try {
+      const err = await res.json();
+      if (err.error) {
+        msg = err.error.message || msg;
+        code = err.error.code ? "（code: " + err.error.code + "）" : "";
+      }
+    } catch (e) {}
+    throw new Error(msg + code + " [HTTP " + res.status + "]");
+  }
+
+  const data = await res.json();
+  const content = data.choices[0].message.content;
+
+  // 健壮解析 JSON
+  let obj = null;
+  try {
+    obj = JSON.parse(content);
+  } catch (e) {
+    const stripped = content.replace(/```json|```/g, "").trim();
+    const start = stripped.indexOf("{");
+    const end = stripped.lastIndexOf("}");
+    if (start >= 0 && end > start) obj = JSON.parse(stripped.slice(start, end + 1));
+  }
+  if (!obj) throw new Error("AI 返回格式无法解析");
+  return obj;
+}
+
+async function callDeepSeek(text, isWord) {
+  const prompt = isWord ? WORD_PROMPT : SENT_PROMPT;
+  const obj = await callDeepSeekAPI(prompt, (isWord ? "词语：" : "句子：") + text);
+
+  if (!Array.isArray(obj.list)) throw new Error("AI 返回格式无法解析");
+
+  const TAG = isWord ? KIND_TAG : SENT_TAG;
+  const list = KIND_ORDER.map(kind => {
+    const item = obj.list.find(x => x.kind === kind);
+    return { t: TAG[kind], en: item ? item.en : "（生成失败）" };
+  });
+
+  if (!isWord) {
+    const pairs = [];
+    const raw = obj.mistake;
+    (Array.isArray(raw) ? raw : [raw]).forEach(m => {
+      if (m && m.wrong && m.right) {
+        pairs.push({ wrong: String(m.wrong), right: String(m.right) });
+      }
+    });
+    return {
+      list,
+      mistake: pairs.slice(0, 2),
+      scene: typeof obj.scene === "string" ? obj.scene : ""
+    };
+  }
+
+  let replace = null;
+  const rep = obj.replace;
+  if (rep && typeof rep === "object") {
+    const words = (Array.isArray(rep.words) ? rep.words : [])
+      .filter(w => typeof w === "string" && w.trim())
+      .slice(0, 4);
+    if (typeof rep.pattern === "string" && rep.pattern.indexOf("___") >= 0 && words.length) {
+      replace = { pattern: rep.pattern, zh: rep.zh || "", words: words };
+    }
+  }
+  return { list, word: obj.word || null, definition: obj.definition || null, replace };
+}
+
+// 选择题 API 调用
+async function generateChoiceQuiz(text) {
+  const obj = await callDeepSeekAPI(CHOICE_PROMPT, text);
+  if (!obj.question || !obj.correct || !Array.isArray(obj.options)) {
+    throw new Error("选择题格式错误");
+  }
+  return obj;
+}
+
+// 填空题 API 调用
+async function generateBlankQuiz(text) {
+  const obj = await callDeepSeekAPI(BLANK_PROMPT, text);
+  if (!obj.question || !obj.sentence || !obj.correct || !Array.isArray(obj.options)) {
+    throw new Error("填空题格式错误");
+  }
+  return obj;
+}
+
+// ================= 演示兜底（未填 Key 时用）=================
+// 每条（整句）：list=三级表达（基础表达/更自然的说法/地道表达），
+// mistake=常见错误（wrong 错误句 + right 正确句），scene=使用场景（中文）
+const canned = {
+  "我想吃一个橘子": {
+    list: [
+      { t: "基础表达", en: "I want to eat an orange." },
+      { t: "更自然的说法", en: "I'd like to have an orange." },
+      { t: "地道表达", en: "I'm craving an orange right now." }
+    ],
+    mistake: { wrong: "I want to eat orange.", right: "I want to eat an orange." },
+    scene: "跟家人朋友说想吃什么，或点餐时说。"
+  },
+  "你今天看起来很累": {
+    list: [
+      { t: "基础表达", en: "You look very tired today." },
+      { t: "更自然的说法", en: "You look worn out today." },
+      { t: "地道表达", en: "You seem really beat today." }
+    ],
+    mistake: { wrong: "You look like very tired today.", right: "You look really tired today." },
+    scene: "看到朋友或同事明显疲惫、想关心问候时说。"
+  },
+  "这个主意不错，但实施起来很难": {
+    list: [
+      { t: "基础表达", en: "This idea is good, but it is hard to do." },
+      { t: "更自然的说法", en: "That's a good idea, but it won't be easy to pull off." },
+      { t: "地道表达", en: "Sounds great in theory, but it's a tough sell." }
+    ],
+    mistake: { wrong: "This idea is good, but implement is very hard.", right: "That's a good idea, but it's hard to pull off." },
+    scene: "讨论方案、评价别人建议时。"
+  },
+  "别担心，慢慢来": {
+    list: [
+      { t: "基础表达", en: "Don't worry, take it slowly." },
+      { t: "更自然的说法", en: "Don't stress, no rush." },
+      { t: "地道表达", en: "Easy does it." }
+    ],
+    mistake: { wrong: "Don't worry, do it slow slow.", right: "Don't worry — take your time." },
+    scene: "安慰着急、紧张或正赶进度的人时。"
+  },
+  "外面下雨了，记得带伞": {
+    list: [
+      { t: "基础表达", en: "It is raining outside, remember to bring an umbrella." },
+      { t: "更自然的说法", en: "It's raining out, don't forget your umbrella." },
+      { t: "地道表达", en: "It's pouring out there, grab an umbrella on your way." }
+    ],
+    mistake: { wrong: "Remember to take umbrella.", right: "Don't forget your umbrella." },
+    scene: "出门前提醒家人朋友带伞时。"
+  },
+  "这部电影太感人了": {
+    list: [
+      { t: "基础表达", en: "This movie is very touching." },
+      { t: "更自然的说法", en: "This movie really moved me." },
+      { t: "地道表达", en: "That film had me tearing up." }
+    ],
+    mistake: { wrong: "This movie made me very moved.", right: "That film had me tearing up." },
+    scene: "和朋友聊刚看过的电影、分享感受时。"
+  },
+  "我们什么时候出发": {
+    list: [
+      { t: "基础表达", en: "When do we leave?" },
+      { t: "更自然的说法", en: "What time are we heading out?" },
+      { t: "地道表达", en: "When are we out of here?" }
+    ],
+    mistake: { wrong: "We what time start?", right: "What time are we heading out?" },
+    scene: "出行前问同伴出发时间。"
+  },
+  "这道菜太咸了": {
+    list: [
+      { t: "基础表达", en: "This dish is too salty." },
+      { t: "更自然的说法", en: "This is way too salty." },
+      { t: "地道表达", en: "Did they empty the whole salt shaker into this?" }
+    ],
+    mistake: { wrong: "The dish's salt is too much.", right: "This dish is way too salty." },
+    scene: "在饭桌或餐厅评价菜品时说。"
+  },
+  "他说话太快了，我跟不上": {
+    list: [
+      { t: "基础表达", en: "He speaks too fast, I can't follow." },
+      { t: "更自然的说法", en: "He talks so fast that I can't keep up." },
+      { t: "地道表达", en: "He speaks a mile a minute, I'm totally lost." }
+    ],
+    mistake: { wrong: "He speaks too fast, I can't hear clearly.", right: "He talks so fast that I can't keep up." },
+    scene: "向别人解释为什么听不懂某个语速很快的人说话时。"
+  },
+  "我明天要早起": {
+    list: [
+      { t: "基础表达", en: "I need to get up early tomorrow." },
+      { t: "更自然的说法", en: "I have to wake up early tomorrow." },
+      { t: "地道表达", en: "I've got an early start tomorrow." }
+    ],
+    mistake: { wrong: "Tomorrow I must early get up.", right: "I've got an early start tomorrow." },
+    scene: "提前说明明天要早起，比如晚上要早睡时说。"
+  },
+  "帮我一个忙好吗": {
+    list: [
+      { t: "基础表达", en: "Can you help me?" },
+      { t: "更自然的说法", en: "Can you do me a favor?" },
+      { t: "地道表达", en: "Could you do me a solid?" }
+    ],
+    mistake: { wrong: "Can you help me a small thing?", right: "Can you do me a favor?" },
+    scene: "请别人帮个不大不小的忙时。"
+  },
+  "这双鞋穿着很舒服": {
+    list: [
+      { t: "基础表达", en: "These shoes are comfortable to wear." },
+      { t: "更自然的说法", en: "These shoes are really comfortable." },
+      { t: "地道表达", en: "These shoes feel amazing on my feet." }
+    ],
+    mistake: { wrong: "Wear this pair of shoes is very comfortable.", right: "These shoes are really comfortable." },
+    scene: "试穿或买鞋后评价、向朋友推荐时说。"
+  },
+  "我们好久没见了": {
+    list: [
+      { t: "基础表达", en: "We haven't seen each other for a long time." },
+      { t: "更自然的说法", en: "It's been a long time since we met." },
+      { t: "地道表达", en: "We haven't caught up in ages!" }
+    ],
+    mistake: { wrong: "We haven't seen for a long time.", right: "We haven't caught up in ages!" },
+    scene: "偶遇老朋友寒暄时说。"
+  },
+  "周末你想做什么": {
+    list: [
+      { t: "基础表达", en: "What do you want to do on the weekend?" },
+      { t: "更自然的说法", en: "Any plans for the weekend?" },
+      { t: "地道表达", en: "What are you up to this weekend?" }
+    ],
+    mistake: { wrong: "What do you want to do on Saturday Sunday?", right: "Any plans for the weekend?" },
+    scene: "聊天时问朋友周末的安排。"
+  },
+  "这里的风景真美": {
+    list: [
+      { t: "基础表达", en: "The scenery here is very beautiful." },
+      { t: "更自然的说法", en: "What a beautiful view!" },
+      { t: "地道表达", en: "This place is absolutely stunning." }
+    ],
+    mistake: { wrong: "The scenery here very beautiful.", right: "The scenery here is stunning." },
+    scene: "旅行途中感叹风景、向人介绍景点时说。"
+  },
+  "我对这个不太确定": {
+    list: [
+      { t: "基础表达", en: "I'm not sure about this." },
+      { t: "更自然的说法", en: "I'm not too sure about that." },
+      { t: "地道表达", en: "I can't say for certain." }
+    ],
+    mistake: { wrong: "I don't very sure about this.", right: "I can't say for certain." },
+    scene: "对某件事拿不准、不想把话说死时。"
+  }
+};
+
+// 示例句库：每次刷新/换一批都从中随机抽 4 句
+const POOL = [
+  "我想吃一个橘子", "你今天看起来很累", "这个主意不错，但实施起来很难",
+  "别担心，慢慢来", "外面下雨了，记得带伞", "这部电影太感人了",
+  "我们什么时候出发", "这道菜太咸了", "他说话太快了，我跟不上",
+  "我明天要早起", "帮我一个忙好吗", "这双鞋穿着很舒服",
+  "我们好久没见了", "周末你想做什么", "这里的风景真美", "我对这个不太确定"
+];
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// 选择题演示数据（未填 Key 时用）
+const choiceDemo = [
+  {
+    question: "我想吃一个橘子",
+    correct: "I'd like to have an orange.",
+    options: ["I want to eat orange.", "I want eating an orange.", "I'm wanting eat orange."]
+  },
+  {
+    question: "你今天看起来很累",
+    correct: "You look really tired today.",
+    options: ["You look like very tired.", "You are look very tired.", "You look very tire today."]
+  },
+  {
+    question: "我明天要早起",
+    correct: "I've got an early start tomorrow.",
+    options: ["Tomorrow I must early get up.", "I must get up early in tomorrow.", "Tomorrow I need early wake up."]
+  },
+  {
+    question: "帮我一个忙好吗",
+    correct: "Can you do me a favor?",
+    options: ["Can you help me a small thing?", "Can you make me a help?", "You can help me one thing?"]
+  }
+];
+
+// 填空题演示数据（未填 Key 时用）
+const blankDemo = [
+  {
+    question: "我想吃一个橘子",
+    sentence: "I'd like to ___ an orange.",
+    correct: "have",
+    options: ["eat", "get", "take"],
+    zh: "(提示：表达「想要」的意思)"
+  },
+  {
+    question: "这双鞋穿着很舒服",
+    sentence: "These shoes feel ___ on my feet.",
+    correct: "amazing",
+    options: ["comfortable", "good", "nice"],
+    zh: "(提示：选择最地道的表达)"
+  },
+  {
+    question: "我们好久没见了",
+    sentence: "We haven't ___ in ages!",
+    correct: "caught up",
+    options: ["met", "seen", "talked"],
+    zh: "(提示：表达「叙旧、聊天」)"
+  },
+  {
+    question: "外面下雨了",
+    sentence: "It's ___ out there.",
+    correct: "pouring",
+    options: ["raining", "rainy", "rain"],
+    zh: "(提示：表达「下大雨」)"
+  }
+];
+
+// 演示模式的单词库（未填 Key 时查词用）
+const wordDemo = {
+  "苹果": {
+    word: "apple", definition: "n. 苹果",
+    list: [
+      { t: "基础例句", en: "I eat an apple every day." },
+      { t: "自然例句", en: "Want an apple? They're really sweet." },
+      { t: "地道例句", en: "An apple a day keeps the doctor away." }
+    ],
+    replace: { pattern: "I eat an ___ every day.", zh: "我每天吃一个…。",
+               words: ["apple", "orange", "egg"] }
+  },
+  "猫": {
+    word: "cat", definition: "n. 猫",
+    list: [
+      { t: "基础例句", en: "I have a cat." },
+      { t: "自然例句", en: "My cat loves sleeping on the sofa." },
+      { t: "地道例句", en: "The cat's out of the bag now." }
+    ],
+    replace: { pattern: "My ___ sleeps on the sofa all day.", zh: "我的…整天睡沙发。",
+               words: ["cat", "dog", "hamster"] }
+  },
+  "跑步": {
+    word: "run / jog", definition: "v. 跑步；慢跑",
+    list: [
+      { t: "基础例句", en: "I run every morning." },
+      { t: "自然例句", en: "I go for a jog after work." },
+      { t: "地道例句", en: "I'm training for a 10K these days." }
+    ],
+    replace: { pattern: "I go for a ___ every morning.", zh: "我每天早上都去…。",
+               words: ["jog", "run", "walk"] }
+  },
+  "开心": {
+    word: "happy", definition: "adj. 高兴的；开心的",
+    list: [
+      { t: "基础例句", en: "I feel happy today." },
+      { t: "自然例句", en: "I'm so happy to see you!" },
+      { t: "地道例句", en: "I'm on cloud nine right now." }
+    ],
+    replace: { pattern: "I'm really ___ today.", zh: "我今天真的很…。",
+               words: ["happy", "cheerful", "upbeat"] }
+  },
+  "咖啡": {
+    word: "coffee", definition: "n. 咖啡",
+    list: [
+      { t: "基础例句", en: "I drink coffee every day." },
+      { t: "自然例句", en: "Let's grab a coffee sometime." },
+      { t: "地道例句", en: "I can't function without my morning coffee." }
+    ],
+    replace: { pattern: "Let's grab a ___ sometime.", zh: "改天一起去喝杯…吧。",
+               words: ["coffee", "tea", "smoothie"] }
+  },
+  "开心地学习": {
+    word: "learn happily", definition: "adv.+v. 开心地学习",
+    list: [
+      { t: "基础例句", en: "She learns happily." },
+      { t: "自然例句", en: "I want to learn English in a fun way." },
+      { t: "地道例句", en: "Make learning a habit and it'll never feel like a chore." }
+    ],
+    replace: { pattern: "I want to ___ English in a fun way.", zh: "我想用好玩的方式…英语。",
+               words: ["learn", "study", "pick up"] }
+  }
+};
+
+async function demoTranslate(text, isWord) {
+  await delay(700 + Math.random() * 500);
+  if (isWord) {
+    if (wordDemo[text]) return Object.assign({ isDemo: false }, wordDemo[text]);
+    // 词库未收录的单词：占位演示
+    return {
+      list: [
+        { t: "基础例句", en: "(" + text + ") 的基础例句——接入 API 后自动生成" },
+        { t: "自然例句", en: "(" + text + ") 的自然例句——接入 API 后自动生成" },
+        { t: "地道例句", en: "(" + text + ") 的地道例句——接入 API 后自动生成" }
+      ],
+      word: text, definition: "（接入 API 后自动生成释义）", isDemo: true
+    };
+  }
+  if (canned[text]) return Object.assign({ isDemo: false }, canned[text]);
+  const n = text.replace(/[。！？，,.!?]/g, " ");
+  return {
+    list: [
+      { t: "基础表达", en: "(" + n + ") 的基础表达——接入 API 后自动生成" },
+      { t: "更自然的说法", en: "(" + n + ") 的更自然的说法——接入 API 后自动生成" },
+      { t: "地道表达", en: "(" + n + ") 的地道表达——接入 API 后自动生成" }
+    ],
+    isDemo: true
+  };
+}
+
+async function translate(text, isWord) {
+  // 先检查缓存
+  const cached = getCache(text, isWord);
+  if (cached) {
+    console.log('使用缓存结果:', text);
+    return cached;
+  }
+
+  // 没有缓存，调用 API 或演示模式
+  let result;
+  if (CFG.key) {
+    result = Object.assign({ isDemo: false }, await callDeepSeek(text, isWord));
+  } else {
+    result = await demoTranslate(text, isWord);
+  }
+
+  // 存入缓存
+  setCache(text, isWord, result);
+  return result;
+}
+
+// ================= 朗读（浏览器内置语音合成）=================
+const SPEAK_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
+  'stroke-linecap="round" stroke-linejoin="round">' +
+  '<path d="M11 5 6 9H2v6h4l5 4V5z" fill="currentColor" stroke="none"/>' +
+  '<path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>' +
+  '<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>' +
+  "</svg>";
+
+// 页面底部的小提示条
+function showToast(msg) {
+  const el = document.getElementById("voiceToast");
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add("show");
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove("show"), 8000);
+}
+
+function speak(text) {
+  if (!("speechSynthesis" in window)) { showToast("当前浏览器不支持语音朗读"); return; }
+  const clean = String(text).replace(/_+/g, "…");   // ___ 空位读成停顿，避免被读成 underline
+
+  const doSpeak = () => {
+    speechSynthesis.cancel();                         // 连点时不叠音
+    const u = new SpeechSynthesisUtterance(clean);
+    const vs = speechSynthesis.getVoices();
+    const en = vs.find(v => /^en-US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang));
+    const RATE = { slow: .8, normal: .92, fast: 1.12 };  // 语音设置里的三档语速
+    u.rate = RATE[CFG.speakRate] || .92;
+    u.lang = en ? en.lang : (/[\u4e00-\u9fa5]/.test(clean) ? "zh-CN" : "en-US");
+    if (en) u.voice = en;
+    // Chrome 语音引擎偶发"假死"：speak() 后既不出声也不触发任何回调。
+    // 用 watchdog 检测：2.5 秒内没开始、没报错 → 判定引擎无响应，给用户明确指引
+    let started = false;
+    const watchdog = setTimeout(() => {
+      if (!started) {
+        showToast("语音引擎没有响应（Chrome 已知问题）：请完全退出浏览器重开——右键任务栏 Chrome 图标 → 退出，或在任务管理器结束所有 Chrome 进程后再打开本页。");
+      }
+    }, 2500);
+    u.onstart = () => { started = true; clearTimeout(watchdog); };
+    u.onerror = e => {
+      clearTimeout(watchdog);
+      // 读不出来时给出明确提示，不再静默失败
+      if (e.error !== "interrupted" && e.error !== "canceled") {
+        showToast("没有可用的朗读语音：请在 Windows「设置 → 时间与语言 → 语音」安装「英语(美国)」语音包，再刷新本页。");
+      }
+    };
+    u.onend = () => clearTimeout(watchdog);
+    speechSynthesis.resume();   // 修复 Chrome 偶发"卡住不出声"的问题
+    speechSynthesis.speak(u);
+  };
+
+  if (speechSynthesis.getVoices().length) { doSpeak(); return; }
+  // 浏览器首次访问时语音列表可能是空的（异步加载），等它就绪后再读
+  const timer = setTimeout(() => {
+    if (!speechSynthesis.getVoices().length) {
+      showToast("没检测到可用的朗读语音：请在 Windows「设置 → 时间与语言 → 语音」安装「英语(美国)」语音包，再刷新本页。");
+    }
+  }, 1500);
+  speechSynthesis.onvoiceschanged = () => { clearTimeout(timer); doSpeak(); };
+}
+
+// 语音列表就绪时，同步刷新「语音设置」页的检测结果
+speechSynthesis.onvoiceschanged = () => { updateVoiceInfo(); };
+
+// ================= 界面逻辑 =================
+const input     = document.getElementById("input");
+const go        = document.getElementById("go");
+const loading   = document.getElementById("loading");
+const results   = document.getElementById("results");
+const demoNote  = document.getElementById("demoNote");
+const errorBox  = document.getElementById("errorBox");
+const modeTag   = document.getElementById("modeTag");
+const settings  = document.getElementById("settings");
+const apiKeyEl  = document.getElementById("apiKey");
+const apiUrlEl  = document.getElementById("apiUrl");
+const modelEl   = document.getElementById("model");
+const keyStatus = document.getElementById("keyStatus");
+const rememberModeEl = document.getElementById("rememberMode");
+
+// 练习模式相关元素
+const viewMode = document.getElementById("viewMode");
+const choiceMode = document.getElementById("choiceMode");
+const blankMode = document.getElementById("blankMode");
+const modeButtons = document.querySelectorAll(".mode-btn");
+
+// 模式切换逻辑
+function switchMode(mode) {
+  CFG.mode = mode;
+  // 开启「记住上次练习模式」时才把当前模式存入本地；否则不记录（每次刷新从查看模式开始）
+  if (CFG.rememberMode) {
+    localStorage.setItem("practice_mode", mode);
+  }
+
+  // 更新按钮状态
+  modeButtons.forEach(btn => {
+    if (btn.dataset.mode === mode) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+
+  // 切换显示的内容区域
+  viewMode.style.display = mode === "view" ? "block" : "none";
+  choiceMode.classList.toggle("show", mode === "choice");
+  blankMode.classList.toggle("show", mode === "blank");
+
+  // 切换到练习模式时加载第一题
+  if (mode === "choice") {
+    loadChoiceQuestion();
+  } else if (mode === "blank") {
+    loadBlankQuestion();
+  }
+}
+
+// 绑定模式切换按钮
+modeButtons.forEach(btn => {
+  btn.addEventListener("click", () => switchMode(btn.dataset.mode));
+});
+
+function refreshModeUI() {
+  if (CFG.key) {
+    modeTag.textContent = "AI 已连接";
+    modeTag.className = "tag online";
+  } else {
+    modeTag.textContent = "演示模式";
+    modeTag.className = "tag demo";
+  }
+  apiKeyEl.value = CFG.key;
+  apiUrlEl.value = CFG.baseUrl;
+  modelEl.value = CFG.model;
+  rememberModeEl.checked = CFG.rememberMode;
+  keyStatus.textContent = "";
+  const saved = !!CFG.key;
+  keyStatus.classList.toggle("saved", saved);
+  keyStatus.classList.toggle("unsaved", !saved);
+  if (saved) {
+    keyStatus.append(document.createTextNode("已保存（尾号 "));
+    const mono = document.createElement("span");
+    mono.className = "mono";
+    mono.textContent = CFG.key.slice(-4);
+    keyStatus.appendChild(mono);
+    keyStatus.appendChild(document.createTextNode("）"));
+  }
+}
+refreshModeUI();
+
+// 切换模型即时生效并自动保存
+modelEl.addEventListener("change", () => {
+  CFG.model = modelEl.value;
+  localStorage.setItem("ds_model", CFG.model);
+  refreshModeUI();
+});
+
+// ================= 设置弹窗（左侧 Tab 导航） =================
+const paneTabs = document.querySelectorAll(".st-tab");
+const panes = document.querySelectorAll(".pane");
+const closeSettingsBtn = document.getElementById("closeSettings");
+const connCard = document.getElementById("connCard");
+const connTitle = document.getElementById("connTitle");
+const connDesc = document.getElementById("connDesc");
+const testBtn = document.getElementById("testBtn");
+const eyeBtn = document.getElementById("toggleKeyView");
+const autoSpeakEl = document.getElementById("autoSpeak");
+const rateBtns = document.querySelectorAll("#rateSeg button");
+
+function openSettings() {
+  settings.classList.add("open");
+  refreshModeUI();   // 同步输入框与「已保存」状态
+  refreshConn();     // 同步连接状态卡片
+  syncVoiceUI();     // 同步语速 / 自动朗读
+  updateVoiceInfo(); // 检测当前浏览器可用的朗读语音
+}
+function closeSettings() {
+  settings.classList.remove("open");
+}
+
+document.getElementById("toggleSettings").addEventListener("click", () => {
+  if (settings.classList.contains("open")) closeSettings(); else openSettings();
+});
+closeSettingsBtn.addEventListener("click", closeSettings);
+settings.addEventListener("click", e => { if (e.target === settings) closeSettings(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && settings.classList.contains("open")) closeSettings();
+});
+
+// Tab 切换：左侧菜单 → 右侧内容
+function switchPane(name) {
+  paneTabs.forEach(t => t.classList.toggle("active", t.dataset.pane === name));
+  panes.forEach(p => p.classList.toggle("active", p.id === "pane-" + name));
+}
+paneTabs.forEach(t => t.addEventListener("click", () => switchPane(t.dataset.pane)));
+
+// 密钥显示 / 隐藏
+eyeBtn.addEventListener("click", () => {
+  const show = apiKeyEl.type === "password";
+  apiKeyEl.type = show ? "text" : "password";
+  eyeBtn.textContent = show ? "隐藏" : "显示";
+});
+
+// 连接状态卡片：ready(已保存) / ok(测试通过) / err(失败) / testing(测试中)
+function setConn(kind, title, desc) {
+  ["ready", "ok", "err", "testing"].forEach(c => connCard.classList.remove(c));
+  if (kind) connCard.classList.add(kind);
+  connTitle.textContent = title;
+  connDesc.textContent = desc || "";
+}
+function refreshConn() {
+  if (!CFG.key) {
+    setConn("", "未连接 · 演示模式",
+      "不填密钥也能先体验：输入句子会展示内置示例。填好下方密钥并保存后，" +
+      "即可获得真正的 AI 表达与纠错。");
+  } else {
+    setConn("ready", "密钥已保存",
+      "密钥尾号 " + CFG.key.slice(-4) + "，只存在这台电脑里。点「测试连接」确认可用后即可开始。");
+  }
+}
+
+async function testConnection() {
+  const key = apiKeyEl.value.trim() || CFG.key;
+  if (!key) {
+    setConn("err", "还没有密钥", "请先在上方填入 AI 密钥（API Key），点「保存」。");
+    return;
+  }
+  const model = modelEl.value || CFG.model;
+  testBtn.disabled = true;
+  setConn("testing", "正在测试…", "已向 AI 发出一条问候消息，通常几秒内返回。");
+  try {
+    let u = (apiUrlEl.value.trim() || "https://api.deepseek.com").replace(/\/+$/, "");
+    if (/^https?:\/\/api\.deepseek\.com$/i.test(u) || /\/v1$/i.test(u)) u += "/chat/completions";
+    const headers = { "Content-Type": "application/json", "Authorization": "Bearer " + key };
+    let url = u;
+    if (VIA_PROXY) { url = "/api"; headers["X-Upstream-URL"] = u; }
+    const t0 = performance.now();
+    const res = await fetch(url, {
+      method: "POST", headers,
+      body: JSON.stringify({
+        model, messages: [{ role: "user", content: "你好" }],
+        max_tokens: 8, stream: false
+      })
+    });
+    const ms = Math.round(performance.now() - t0);
+    if (!res.ok) {
+      let m = "HTTP " + res.status;
+      try { const j = await res.json(); if (j.error) m = j.error.message || m; } catch (e) {}
+      throw new Error(m);
+    }
+    await res.json();
+    setConn("ok", "连接正常",
+      "模型「" + model + "」响应成功（用时 " + ms + " 毫秒），可以开始练习啦。");
+  } catch (e) {
+    setConn("err", "连接失败",
+      String(e.message || e) + "。可检查密钥、接口地址与网络后重试。");
+  }
+  testBtn.disabled = false;
+}
+testBtn.addEventListener("click", testConnection);
+
+// ================= 语音 / 学习偏好 =================
+function syncVoiceUI() {
+  rateBtns.forEach(b => b.classList.toggle("active", b.dataset.rate === CFG.speakRate));
+  autoSpeakEl.checked = CFG.autoSpeak;
+}
+rateBtns.forEach(b => {
+  b.addEventListener("click", () => {
+    CFG.speakRate = b.dataset.rate;
+    localStorage.setItem("ds_speak_rate", CFG.speakRate);
+    syncVoiceUI();
+    speak("This is how fast I read.");  // 试听当前语速
+  });
+});
+autoSpeakEl.addEventListener("change", () => {
+  CFG.autoSpeak = autoSpeakEl.checked;
+  localStorage.setItem("ds_auto_speak", CFG.autoSpeak ? "1" : "0");
+});
+
+// 「语音设置」页：检测并展示浏览器当前能用的朗读语音（朗读用的是系统语音包，与文件路径无关）
+function updateVoiceInfo() {
+  const el = document.getElementById("voiceInfo");
+  if (!el) return;
+  const vs = speechSynthesis.getVoices();
+  const en = vs.filter(v => /^en(-|_)/i.test(v.lang));
+  el.className = "voice-check " + (en.length ? "ok" : "null");
+  el.textContent = "";
+  const line = document.createElement("div");
+  if (vs.length) {
+    const names = (en.length ? en : vs).slice(0, 3).map(v => v.name).join("、");
+    line.textContent = (en.length ? "✅ 已检测到英语朗读语音：" + names : "⚠️ 系统有语音，但没有英语语音：" + names)
+      + (vs.length > 3 ? "（共 " + vs.length + " 个）" : "");
+    const sub = document.createElement("small");
+    sub.textContent = en.length
+      ? "点击 🔊 即可朗读；若仍无声，请看页面底部的提示条。"
+      : "英文句子可能读不出声。建议在 Windows「设置 → 时间与语言 → 语音」安装「英语(美国)」语音包。";
+    el.appendChild(line); el.appendChild(sub);
+  } else {
+    line.textContent = "❌ 没有检测到任何可用的朗读语音。请在 Windows「设置 → 时间与语言 → 语音」里安装「英语(美国)」语音包，再刷新本页。";
+    el.appendChild(line);
+  }
+}
+updateVoiceInfo();
+
+// 「记住上次练习模式」开关：即时生效并保存
+rememberModeEl.addEventListener("change", () => {
+  CFG.rememberMode = rememberModeEl.checked;
+  localStorage.setItem("ds_remember_mode", CFG.rememberMode ? "1" : "0");
+  // 关闭时把当前模式拉回查看模式，避免和「记住」产生歧义
+  if (!CFG.rememberMode) switchMode("view");
+});
+const saveKeyBtn = document.getElementById("saveKey");
+function saveKeySettings() {
+  CFG.key = apiKeyEl.value.trim();
+  CFG.baseUrl = apiUrlEl.value.trim() || "https://api.deepseek.com";
+  CFG.model = modelEl.value;
+  localStorage.setItem("ds_key", CFG.key);
+  localStorage.setItem("ds_url", CFG.baseUrl);
+  localStorage.setItem("ds_model", CFG.model);
+  refreshModeUI();
+}
+saveKeyBtn.addEventListener("click", () => {
+  saveKeySettings();
+  refreshConn();  // 保存后同步刷新连接状态卡片
+  // 「保存」后短暂高亮状态，给用户即时反馈
+  keyStatus.classList.add("saved-flash");
+  setTimeout(() => keyStatus.classList.remove("saved-flash"), 1200);
+});
+
+// 查询站点实际支持的模型，自动填入下拉框（Key 只在本机使用）
+const listModelsBtn = document.getElementById("listModels");
+const modelsOut = document.getElementById("modelsOut");
+
+async function fetchModels() {
+  modelsOut.className = "";
+  if (!CFG.key) {
+    modelsOut.textContent = "请先填入并保存 API Key，再查询模型。";
+    return;
+  }
+  listModelsBtn.disabled = true;
+  modelsOut.textContent = "查询中…";
+  try {
+    // 完整请求地址推导 models 列表地址：xxx/chat/completions -> xxx/models
+    const chatUrl = apiEndpoint();
+    const modelsUrl = chatUrl.replace(/\/chat\/completions$/i, "") + "/models";
+    const headers = { "Authorization": "Bearer " + CFG.key };
+    let url = modelsUrl;
+    if (VIA_PROXY) { url = "/api/models"; headers["X-Upstream-URL"] = modelsUrl; }
+
+    const res = await fetch(url, { method: "GET", headers });
+    if (!res.ok) {
+      let m = "HTTP " + res.status;
+      try { const j = await res.json(); m = (j.error && j.error.message) || m; } catch (e) {}
+      throw new Error(m);
+    }
+    const j = await res.json();
+    const ids = (j.data || []).map(x => x.id).filter(Boolean);
+    if (!ids.length) throw new Error("接口返回空模型列表");
+
+    const sel = modelEl;
+    sel.innerHTML = "";
+    ids.forEach(id => {
+      const o = document.createElement("option");
+      o.value = id; o.textContent = id;
+      sel.appendChild(o);
+    });
+    const fav = ids.find(id => /v4/i.test(id)) || ids[0];
+    sel.value = fav;
+    modelsOut.className = "ok";
+    modelsOut.textContent = "共找到 " + ids.length + " 个可用模型，已为你选好：「" +
+      fav + "」。可去「AI 连接」点「测试连接」确认可用。";
+  } catch (e) {
+    modelsOut.className = "err";
+    modelsOut.textContent = "查询失败：" + e.message;
+  }
+  listModelsBtn.disabled = false;
+}
+listModelsBtn.addEventListener("click", fetchModels);
+
+function showError(msg) {
+  errorBox.textContent = "出错了：" + msg;
+  errorBox.classList.add("show");
+}
+function hideError() {
+  errorBox.classList.remove("show");
+  errorBox.textContent = "";
+}
+
+// 生成一张结果卡片：label=左上标签，speakText=朗读内容，mainText=正文，
+// zhText=可选小字，cls=配色类（def/lv-simple/lv-natural/lv-native/lv-replace），
+// chips=可替换词按钮列表（点击朗读）
+function appendCard(label, speakText, mainText, zhText, cls, chips) {
+  const div = document.createElement("div");
+  div.className = "result" + (cls ? " " + cls : "");
+  const head = document.createElement("div");
+  head.className = "result-head";
+  const tag = document.createElement("span");
+  tag.className = "tag";
+  tag.textContent = label;
+  const btn = document.createElement("button");
+  btn.className = "speak";
+  btn.type = "button";
+  btn.title = "朗读";
+  btn.innerHTML = SPEAK_ICON;
+  btn.addEventListener("click", () => speak(speakText));
+  head.appendChild(tag);
+  head.appendChild(btn);
+  div.appendChild(head);
+
+  const en = document.createElement("div");
+  en.className = "en";
+  // 正文中的 ___ 空位拆出来高亮（如可替换词的填空句）
+  String(mainText).split("___").forEach((part, i, arr) => {
+    if (part) {
+      const sp = document.createElement("span");
+      sp.className = "english";
+      sp.textContent = part;
+      en.appendChild(sp);
+    }
+    if (i < arr.length - 1) {
+      const b = document.createElement("span");
+      b.className = "blank";
+      b.textContent = "___";
+      en.appendChild(b);
+    }
+  });
+  div.appendChild(en);
+
+  if (zhText) {
+    const zh = document.createElement("div");
+    zh.className = "zh";
+    zh.textContent = zhText;
+    div.appendChild(zh);
+  }
+  if (Array.isArray(chips) && chips.length) {
+    const wrap = document.createElement("div");
+    wrap.className = "chips";
+    chips.forEach(w => {
+      const c = document.createElement("button");
+      c.className = "chip";
+      c.type = "button";
+      c.textContent = w;
+      c.title = "朗读：" + w;
+      c.addEventListener("click", () => speak(w));
+      wrap.appendChild(c);
+    });
+    div.appendChild(wrap);
+  }
+  results.appendChild(div);
+}
+
+// 常见错误卡：红色边框，一行 ❌ 错误句 + 一行 ✅ 正确句（可朗读）
+function appendMistake(pairs) {
+  const div = document.createElement("div");
+  div.className = "result lv-mistake";
+  const head = document.createElement("div");
+  head.className = "result-head";
+  const tag = document.createElement("span");
+  tag.className = "tag";
+  tag.textContent = "常见错误";
+  head.appendChild(tag);
+  const btn = document.createElement("button");
+  btn.className = "speak";
+  btn.type = "button";
+  btn.title = "朗读正确说法";
+  btn.innerHTML = SPEAK_ICON;
+  btn.addEventListener("click", () => speak(pairs[0].right));
+  head.appendChild(btn);
+  div.appendChild(head);
+  pairs.forEach(p => {
+    const wl = document.createElement("div");
+    wl.className = "m-line bad";
+    wl.textContent = "❌ " + p.wrong;
+    div.appendChild(wl);
+    const okRow = document.createElement("div");
+    okRow.className = "m-line";
+    const tx = document.createElement("span");
+    tx.className = "ok";
+    tx.textContent = "✅ " + p.right;
+    okRow.appendChild(tx);
+    const ob = document.createElement("button");
+    ob.className = "speak";
+    ob.type = "button";
+    ob.title = "朗读";
+    ob.innerHTML = SPEAK_ICON;
+    ob.addEventListener("click", () => speak(p.right));
+    okRow.appendChild(ob);
+    div.appendChild(okRow);
+  });
+  results.appendChild(div);
+}
+
+// 使用场景卡：中性灰，一段中文说明
+function appendScene(text) {
+  const div = document.createElement("div");
+  div.className = "result lv-scene";
+  const head = document.createElement("div");
+  head.className = "result-head";
+  const tag = document.createElement("span");
+  tag.className = "tag";
+  tag.textContent = "使用场景";
+  head.appendChild(tag);
+  div.appendChild(head);
+  const sc = document.createElement("div");
+  sc.className = "scene-text";
+  sc.textContent = text;
+  div.appendChild(sc);
+  results.appendChild(div);
+}
+
+async function run() {
+  const text = input.value.trim();
+  if (!text) { input.focus(); return; }
+
+  go.disabled = true;
+  loading.classList.add("show");
+  results.innerHTML = "";
+  demoNote.textContent = "";
+  hideError();
+
+  const isWord = isWordQuery(text); // 单词 → 查词模式；否则整句 → 教练五段式
+  let r;
+  try {
+    r = await translate(text, isWord);
+  } catch (err) {
+    loading.classList.remove("show");
+    go.disabled = false;
+    let hint = "";
+    if (/Failed to fetch|NetworkError|load failed/i.test(String(err))) {
+      const target = VIA_PROXY ? "本地代理" : apiEndpoint();
+      hint = VIA_PROXY
+        ? "（无法访问本地代理服务，请确认已通过 start.bat 或 python server.py 启动）"
+        : "（无法连接到 " + target + "：浏览器跨域限制或网络不通。推荐改用 start.bat 启动的本地服务方式运行，可绕过跨域）";
+    }
+    showError(err.message + hint);
+    return;
+  }
+
+  loading.classList.remove("show");
+  go.disabled = false;
+
+  const LV_CLS = ["lv-simple", "lv-natural", "lv-native"];
+
+  if (isWord) {
+    // ---- 查词模式（维持原样）----
+    // ① 单词释义卡（紫色）：先讲核心词，再造句
+    if (r.word && r.definition) {
+      const w = String(r.word);
+      // 词本身为纯英文时直接读它，否则读释义（释义含英文）
+      const speakWord = /^[A-Za-z][A-Za-z .'/-]*$/.test(w) ? w : r.definition;
+      appendCard("单词释义", speakWord, w, r.definition, "def");
+    }
+    // ② 三级例句卡（按查词标签：基础例句/自然例句/地道例句）
+    r.list.forEach((item, i) => {
+      appendCard(item.t, item.en, item.en, null, LV_CLS[i] || "");
+    });
+    // ③ 可替换词卡（青色）：填空句 + 可点击朗读的候选词
+    if (r.replace) {
+      appendCard("可替换词", r.replace.pattern, r.replace.pattern,
+                 r.replace.zh || "", "lv-replace", r.replace.words);
+    }
+    if (r.isDemo) {
+      demoNote.textContent =
+        "※ 演示模式：该词暂无内置词条，接入 DeepSeek API 后自动生成释义与例句。";
+    } else if (CFG.autoSpeak) {
+      // 语音设置里开启「自动朗读」：查词时读单词本身（或释义）
+      const w = String(r.word || "");
+      const first = r.list && r.list[0] ? r.list[0].en : "";
+      const t = /^[A-Za-z][A-Za-z .'/-]*$/.test(w) ? w : (r.definition || first);
+      if (t) speak(t);
+    }
+    return;
+  }
+
+  // ---- 整句模式（新版五段：基础表达 → 更自然的说法 → 地道表达 → 常见错误 → 使用场景）----
+  // ① 三级表达卡（蓝 / 绿 / 橙）
+  r.list.forEach((item, i) => {
+    appendCard(item.t, item.en, item.en, null, LV_CLS[i] || "");
+  });
+  // ② 常见错误卡（红）：❌ 中国人容易说错 / ✅ 正确说法
+  if (r.mistake && r.mistake.length) {
+    appendMistake(r.mistake);
+  }
+  // ③ 使用场景卡（灰）：中文说明一句话用在哪
+  if (r.scene) {
+    appendScene(r.scene);
+  }
+  if (r.isDemo) {
+    demoNote.textContent =
+      "※ 演示模式：点击上方「⚙ 设置」→「AI 连接」，填入密钥并保存，" +
+      "即可对任意句子生成真正地道、可开口的表达。";
+  } else if (CFG.autoSpeak) {
+    // 语音设置里开启「自动朗读」：整句先读「基础表达」
+    if (r.list && r.list[0]) speak(r.list[0].en);
+  }
+}
+
+go.addEventListener("click", run);
+input.addEventListener("keydown", e => { if (e.key === "Enter") run(); });
+
+// 示例句子随机展示：刷新页面即换一批，点「换一批」再换
+const examplesBox = document.getElementById("examplesBox");
+const withDemo = POOL.filter(s => canned[s]);   // 优先选有演示答案的句子
+
+function renderExamples() {
+  examplesBox.innerHTML = "";
+  const src = withDemo.length >= 4 ? withDemo : POOL;
+  // 洗牌后取前 4 句
+  const picked = shuffle(src).slice(0, 4);
+  picked.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "example";
+    b.textContent = s;
+    b.addEventListener("click", () => { input.value = s; run(); });
+    examplesBox.appendChild(b);
+  });
+}
+function shuffle(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+renderExamples();
+document.getElementById("shuffleEx").addEventListener("click", renderExamples);
+
+// ================= 选择题模式 =================
+let currentChoiceIndex = 0;
+let currentChoiceData = null;
+
+async function loadChoiceQuestion(customText) {
+  const choiceQuestion = document.getElementById("choiceQuestion");
+  const choiceOptions = document.getElementById("choiceOptions");
+  const choiceFeedback = document.getElementById("choiceFeedback");
+
+  choiceOptions.innerHTML = "";
+  choiceFeedback.classList.remove("show");
+
+  try {
+    let data;
+    if (customText) {
+      // 自定义题目
+      if (!CFG.key) {
+        alert("演示模式不支持自定义题目，请填入 DeepSeek API Key");
+        return;
+      }
+      choiceQuestion.textContent = "生成中...";
+      data = await generateChoiceQuiz(customText);
+    } else {
+      // 使用演示数据或随机句子
+      if (CFG.key) {
+        const randomSentence = POOL[Math.floor(Math.random() * POOL.length)];
+        choiceQuestion.textContent = "生成中...";
+        data = await generateChoiceQuiz(randomSentence);
+      } else {
+        data = choiceDemo[currentChoiceIndex % choiceDemo.length];
+      }
+    }
+
+    currentChoiceData = data;
+    choiceQuestion.textContent = data.question;
+
+    // 打乱选项顺序（正确答案 + 3个错误选项）
+    const allOptions = [data.correct, ...data.options];
+    const shuffled = shuffle(allOptions);
+
+    // 渲染选项
+    shuffled.forEach(option => {
+      const btn = document.createElement("button");
+      btn.className = "quiz-option";
+      btn.textContent = option;
+      btn.addEventListener("click", () => checkChoiceAnswer(option, btn));
+      choiceOptions.appendChild(btn);
+    });
+
+    currentChoiceIndex++;
+  } catch (err) {
+    choiceQuestion.textContent = "生成失败：" + err.message;
+  }
+}
+
+function checkChoiceAnswer(selected, btn) {
+  const choiceOptions = document.getElementById("choiceOptions");
+  const choiceFeedback = document.getElementById("choiceFeedback");
+  const allOptions = choiceOptions.querySelectorAll(".quiz-option");
+
+  // 禁用所有选项
+  allOptions.forEach(opt => opt.classList.add("disabled"));
+
+  if (selected === currentChoiceData.correct) {
+    // 答对
+    btn.classList.add("correct");
+    choiceFeedback.className = "quiz-feedback show correct-fb";
+    choiceFeedback.innerHTML = "✅ 太棒了！完全正确！";
+    speak(currentChoiceData.correct);
+  } else {
+    // 答错
+    btn.classList.add("wrong");
+    // 高亮正确答案
+    allOptions.forEach(opt => {
+      if (opt.textContent === currentChoiceData.correct) {
+        opt.classList.add("correct");
+      }
+    });
+    choiceFeedback.className = "quiz-feedback show wrong-fb";
+    choiceFeedback.innerHTML = "❌ 不对哦<div class='answer'>正确答案：" + currentChoiceData.correct + "</div>";
+    speak(currentChoiceData.correct);  // 答错也朗读正确答案，方便听正确发音
+  }
+}
+
+document.getElementById("choiceNext").addEventListener("click", () => loadChoiceQuestion());
+document.getElementById("choiceCustom").addEventListener("click", () => {
+  const text = prompt("请输入一句中文（例如：我想去看电影）");
+  if (text && text.trim()) {
+    loadChoiceQuestion(text.trim());
+  }
+});
+
+// ================= 填空题模式 =================
+let currentBlankIndex = 0;
+let currentBlankData = null;
+
+async function loadBlankQuestion(customText) {
+  const blankQuestion = document.getElementById("blankQuestion");
+  const blankSentence = document.getElementById("blankSentence");
+  const blankOptions = document.getElementById("blankOptions");
+  const blankFeedback = document.getElementById("blankFeedback");
+
+  blankOptions.innerHTML = "";
+  blankFeedback.classList.remove("show");
+
+  try {
+    let data;
+    if (customText) {
+      // 自定义题目
+      if (!CFG.key) {
+        alert("演示模式不支持自定义题目，请填入 DeepSeek API Key");
+        return;
+      }
+      blankQuestion.textContent = "生成中...";
+      data = await generateBlankQuiz(customText);
+    } else {
+      // 使用演示数据或随机句子
+      if (CFG.key) {
+        const randomSentence = POOL[Math.floor(Math.random() * POOL.length)];
+        blankQuestion.textContent = "生成中...";
+        data = await generateBlankQuiz(randomSentence);
+      } else {
+        data = blankDemo[currentBlankIndex % blankDemo.length];
+      }
+    }
+
+    currentBlankData = data;
+    blankQuestion.textContent = data.question + (data.zh ? " " + data.zh : "");
+    blankSentence.textContent = data.sentence;
+
+    // 打乱选项顺序（正确答案 + 2-3个错误选项）
+    const allOptions = [data.correct, ...data.options];
+    const shuffled = shuffle(allOptions);
+
+    // 渲染选项
+    shuffled.forEach(option => {
+      const btn = document.createElement("button");
+      btn.className = "quiz-option";
+      btn.textContent = option;
+      btn.addEventListener("click", () => checkBlankAnswer(option, btn));
+      blankOptions.appendChild(btn);
+    });
+
+    currentBlankIndex++;
+  } catch (err) {
+    blankQuestion.textContent = "生成失败：" + err.message;
+  }
+}
+
+function checkBlankAnswer(selected, btn) {
+  const blankOptions = document.getElementById("blankOptions");
+  const blankFeedback = document.getElementById("blankFeedback");
+  const blankSentence = document.getElementById("blankSentence");
+  const allOptions = blankOptions.querySelectorAll(".quiz-option");
+
+  // 禁用所有选项
+  allOptions.forEach(opt => opt.classList.add("disabled"));
+
+  // 显示填入结果
+  const filledSentence = currentBlankData.sentence.replace("___", selected);
+
+  if (selected === currentBlankData.correct) {
+    // 答对
+    btn.classList.add("correct");
+    blankFeedback.className = "quiz-feedback show correct-fb";
+    blankFeedback.innerHTML = "✅ 完全正确！<div class='answer'>" + filledSentence + "</div>";
+    speak(filledSentence);
+  } else {
+    // 答错
+    btn.classList.add("wrong");
+    // 高亮正确答案
+    allOptions.forEach(opt => {
+      if (opt.textContent === currentBlankData.correct) {
+        opt.classList.add("correct");
+      }
+    });
+    const correctSentence = currentBlankData.sentence.replace("___", currentBlankData.correct);
+    blankFeedback.className = "quiz-feedback show wrong-fb";
+    blankFeedback.innerHTML = "❌ 不对哦<div class='answer'>正确答案：" + correctSentence + "</div>";
+    speak(correctSentence);  // 答错也朗读完整正确句，方便听正确发音
+  }
+}
+
+document.getElementById("blankNext").addEventListener("click", () => loadBlankQuestion());
+document.getElementById("blankCustom").addEventListener("click", () => {
+  const text = prompt("请输入一句中文（例如：我想去看电影）");
+  if (text && text.trim()) {
+    loadBlankQuestion(text.trim());
+  }
+});
+
+// 初始化：开启「记住模式」则恢复上次所在模式，否则从查看模式开始
+// （必须在所有函数定义之后调用）
+switchMode(CFG.rememberMode ? CFG.mode : "view");
+</script>
+</body>
+</html>
