@@ -284,12 +284,12 @@
   }
   textarea:focus { border-color: #667eea; }
   .row { display: flex; gap: 10px; margin-top: 12px; }
-  #go {
+  #go, #sceneGo {
     width: 100%; background: #667eea; color: #fff; font-weight: bold;
     border: none; border-radius: 10px; padding: 12px; font-size: 16px;
     cursor: pointer; transition: opacity .2s;
   }
-  #go:disabled { opacity: .5; cursor: not-allowed; }
+  #go:disabled, #sceneGo:disabled { opacity: .5; cursor: not-allowed; }
   button.example { background: #f5f5f5; color: #555; font-size: 13px; padding: 8px; flex: 0 0 auto; border: none; border-radius: 6px; cursor: pointer; }
   button.example:hover { background: #e8e8e8; }
   .examples-wrap { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
@@ -335,12 +335,17 @@
     background: #fff1b8; color: #ad6800; border-radius: 4px; padding: 0 5px;
     font-weight: bold;
   }
+  .en .blank.filled { background: #e6fffb; color: #08979c; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .chip {
     flex: 0 0 auto; background: #fff; border: 1px solid #13c2c2; color: #08979c;
     border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer;
   }
   .chip:hover { background: #e6fffb; }
+  /* 候选词点击后的语感三档配色（best/acceptable/wrong） */
+  .chip.correct { background: #f6ffed; border-color: #52c41a; color: #389e0d; font-weight: bold; }
+  .chip.maybe { background: #fffbe6; border-color: #faad14; color: #ad6800; }
+  .chip.wrong { background: #fff2f0; border-color: #ff4d4f; color: #cf1322; }
   .loading { text-align: center; color: #999; padding: 20px; display: none; }
   .loading.show { display: block; }
   #errorBox {
@@ -353,7 +358,7 @@
   /* 练习模式切换 */
   .mode-selector {
     display: flex; gap: 8px; margin-bottom: 16px; justify-content: center;
-    position: relative; z-index: 10;
+    position: relative; z-index: 10; flex-wrap: wrap;
   }
   .mode-btn {
     flex: 1; max-width: 150px; background: #f5f5f5; color: #666; border: 2px solid #e8e8e8;
@@ -374,8 +379,48 @@
   }
   .quiz-question .zh-text {
     font-size: 20px; color: #333; margin-bottom: 8px; font-weight: 500;
+    position: relative; cursor: help;
   }
   .quiz-question .hint { font-size: 13px; color: #999; }
+  /* 悬停翻译提示 */
+  .hover-translation {
+    position: relative; cursor: help;
+  }
+  .hover-translation::after {
+    content: attr(data-translation);
+    position: absolute; left: 50%; bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    background: rgba(35, 40, 70, .95); color: #fff;
+    padding: 8px 14px; border-radius: 8px; font-size: 14px;
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; visibility: hidden;
+    transition: opacity .25s, visibility .25s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+    z-index: 1000;
+  }
+  .hover-translation::before {
+    content: ""; position: absolute; left: 50%; bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(35, 40, 70, .95);
+    pointer-events: none;
+    opacity: 0; visibility: hidden;
+    transition: opacity .25s, visibility .25s;
+    z-index: 1000;
+  }
+  .hover-translation:hover::after,
+  .hover-translation:hover::before {
+    opacity: 1; visibility: visible;
+  }
+  /* 选择题选项的悬停翻译 */
+  .quiz-option.hover-translation {
+    display: block; position: relative;
+  }
+  .quiz-option.hover-translation::after {
+    max-width: 400px; white-space: normal;
+  }
+  /* 填空题题目句 + 朗读按钮 */
+  .q-line { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 12px; }
   .quiz-options {
     display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;
   }
@@ -393,6 +438,10 @@
     background: #fff2f0; border-color: #ff4d4f; color: #cf1322;
     pointer-events: none;
   }
+  .quiz-option.maybe {
+    background: #fffbe6; border-color: #faad14; color: #ad6800;
+    pointer-events: none;
+  }
   .quiz-option.disabled { pointer-events: none; opacity: 0.6; }
   .quiz-feedback {
     display: none; padding: 16px; border-radius: 10px; margin-bottom: 16px;
@@ -405,7 +454,12 @@
   .quiz-feedback.wrong-fb {
     background: #fff2f0; border: 2px solid #ff4d4f; color: #cf1322;
   }
+  .quiz-feedback.maybe-fb {
+    background: #fffbe6; border: 2px solid #faad14; color: #ad6800;
+  }
   .quiz-feedback .answer { font-weight: bold; margin-top: 8px; }
+  /* 结果卡片里嵌的反馈条（可替换词卡）上下留白小一点 */
+  .result .quiz-feedback { margin: 12px 0 0; }
   .quiz-controls {
     display: flex; gap: 10px; justify-content: center;
   }
@@ -419,6 +473,24 @@
   #choiceCustom, #blankCustom {
     background: #f5f5f5; color: #666;
   }
+
+  /* 场景表达模式 */
+  #scenePanel { margin-top: 16px; }  /* 与上方「生成场景表达」按钮拉开间距 */
+  .scene-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .scene-tab {
+    flex: 1 1 auto; min-width: 88px; background: #f5f5f5; color: #666;
+    border: 2px solid #e8e8e8; border-radius: 10px; padding: 9px 10px;
+    font-size: 13px; cursor: pointer; transition: all .2s; white-space: nowrap;
+  }
+  .scene-tab:hover { background: #ebebeb; }
+  .scene-tab.active { background: #667eea; color: #fff; border-color: #667eea; font-weight: bold; }
+
+  /* 反馈条：等级图标 + 解释行 */
+  .quiz-feedback .fb-ico { margin-right: 4px; }
+  .quiz-feedback .fb-explain {
+    margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,.12);
+    font-size: 13px; line-height: 1.6;
+  }
 </style>
 </head>
 <body>
@@ -429,6 +501,7 @@
     <!-- 练习模式切换 -->
     <div class="mode-selector">
       <button class="mode-btn active" data-mode="view">查看模式</button>
+      <button class="mode-btn" data-mode="scene">场景表达</button>
       <button class="mode-btn" data-mode="choice">选择题</button>
       <button class="mode-btn" data-mode="blank">填空题</button>
     </div>
@@ -557,7 +630,7 @@
                 <label class="pref-row" for="rememberMode">
                   <input type="checkbox" id="rememberMode">
                   <span class="pref-text">记住上次的练习模式
-                    <small>开启后，下次打开会停留在你上次用的模式：查看表达 / 选择题 / 填空题。</small>
+                    <small>开启后，下次打开会停留在你上次用的模式：查看表达 / 场景表达 / 选择题 / 填空题。</small>
                   </span>
                 </label>
               </div>
@@ -590,11 +663,34 @@
       <p class="demo-note" id="demoNote"></p>
     </div>
 
+    <!-- 场景表达模式 -->
+    <div id="sceneMode" class="quiz-container">
+      <textarea id="sceneInput" placeholder="请输入一句中文，例如：这里的风景真美"></textarea>
+      <div class="row"><button id="sceneGo">生成场景表达</button></div>
+      <div id="sceneLoading" class="loading">思考中… 正在为四种场景组织表达</div>
+      <div id="scenePanel" hidden>
+        <div class="scene-tabs" id="sceneTabs">
+          <button type="button" class="scene-tab active" data-scene="chat">日常聊天</button>
+          <button type="button" class="scene-tab" data-scene="social_post">社交媒体</button>
+          <button type="button" class="scene-tab" data-scene="formal">正式表达</button>
+          <button type="button" class="scene-tab" data-scene="dating">轻松约会</button>
+        </div>
+        <div class="result lv-scene">
+          <div class="result-head">
+            <span class="tag" id="sceneTag">日常聊天</span>
+            <button class="speak" id="sceneSpeak" type="button" title="朗读"></button>
+          </div>
+          <div class="en" id="sceneText"></div>
+          <div class="zh" id="sceneZh"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- 选择题模式 -->
     <div id="choiceMode" class="quiz-container">
       <div class="quiz-question">
         <div class="zh-text" id="choiceQuestion">请选择正确的英文表达</div>
-        <div class="hint">从下面四个选项中选择最合适的表达</div>
+        <div class="hint">哪一句听起来最自然？</div>
       </div>
       <div class="quiz-options" id="choiceOptions"></div>
       <div class="quiz-feedback" id="choiceFeedback"></div>
@@ -608,7 +704,10 @@
     <div id="blankMode" class="quiz-container">
       <div class="quiz-question">
         <div class="zh-text" id="blankQuestion">选择正确的词填入空位</div>
-        <div class="hint" id="blankSentence" style="font-size:18px;color:#667eea;font-weight:bold;margin-top:12px;">I ___ an orange.</div>
+        <div class="q-line">
+          <div class="hint" id="blankSentence" style="font-size:18px;color:#667eea;font-weight:bold;">I ___ an orange.</div>
+          <button class="speak" id="blankSpeak" type="button" title="朗读"></button>
+        </div>
       </div>
       <div class="quiz-options" id="blankOptions"></div>
       <div class="quiz-feedback" id="blankFeedback"></div>
@@ -715,7 +814,8 @@ const WORD_PROMPT = `你是一位英语表达教练，帮助中国人学单词�
   {"kind":"simple","en":"I eat an apple every day."},
   {"kind":"natural","en":"Want an apple? They're really sweet."},
   {"kind":"native","en":"An apple a day keeps the doctor away."}],
- "replace":{"pattern":"I eat an ___ every day.","zh":"我每天吃一个…","words":["apple","orange","egg"]}}
+ "replace":{"pattern":"I eat an ___ every day.","zh":"我每天吃一个…","options":[
+   {"word":"apple","level":"best"},{"word":"orange","level":"acceptable"},{"word":"egg","level":"acceptable"}]}}
 
 字段规则：
 1) word：输入中文词时给对应英文词；输入英文词时照填。definition 写「词性 + 中文解释」。
@@ -724,39 +824,111 @@ const WORD_PROMPT = `你是一位英语表达教练，帮助中国人学单词�
    - natural 自然例句：日常口语，更自然；
    - native 地道例句：母语者真的会说的说法，可用习语。
    例句围绕该词展开，必须真实、自然、简短，绝对无中式英语。
-3) replace（可替换词）：pattern 是带一个空位 ___（英文三个下划线）的句子，可从上面例句改编；zh 是该句中文意思；words 给 2~4 个能填进空位的关键词（同义词或同类词）。
+3) replace（可替换词）：pattern 是带一个空位 ___（英文三个下划线）的句子，可从上面例句改编；zh 是该句中文意思；options 给 2~4 个能填进空位的词（同义词或同类词），每个词标注 level：
+   - best：最贴合该句、最常用（通常就是被查询的词本身，恰好 1 个）
+   - acceptable：能填进去，但语气或搭配略有差异
+   - wrong：填进去明显不搭配（一般不给）
 
 例句正文里不要出现任何标注符号，只输出 JSON。`;
 
-// 选择题模式：生成 1 个正确答案 + 3 个干扰项
-const CHOICE_PROMPT = `你是一位英语表达教练。用户输入一句中文，请生成一道选择题：
-1 个正确的英文表达 + 3 个错误的干扰项（常见中式英语错误）。
+// 选择题模式（反向训练）：3 个选项，分别为 best / acceptable / wrong
+const CHOICE_PROMPT = `你是一位英语出题助手。用户输入一句中文，请生成一道语感选择题：
+3 个英文选项，其中 level 恰好 best / acceptable / wrong 各一个（选项顺序可打乱）。
+同时标注每个选项中的关键词及其中文释义（用于学习）。
 
 严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
-{"question":"我想吃一个橘子","correct":"I'd like to have an orange.","options":["I want to eat orange.","I want eating an orange.","I'm wanting eat orange."]}
+{"question":"这里的风景真美","options":[
+  {"text":"The scenery here is very beautiful.","level":"wrong","keyword":"scenery","meaning":"风景（书面）"},
+  {"text":"The view here is so nice.","level":"acceptable","keyword":"view","meaning":"景色"},
+  {"text":"The views here are breathtaking!","level":"best","keyword":"breathtaking","meaning":"令人惊叹的"}]}
 
 字段规则：
-- question: 中文原句
-- correct: 正确的地道英文表达（自然口语，非直译）
-- options: 3 个错误选项（必须是中国人容易说错的句子，有明显语法或用词错误）
+- question: 用户输入的中文原句
+- options: 3 句英文表达，每个包含：
+  - text: 完整英文句子
+  - level: 语感等级（best=最自然地道；acceptable=语法正确但不够自然；wrong=典型中式英语或有语法/用词错误）
+  - keyword: 该句中最关键的词或短语（1-3个词）
+  - meaning: 该关键词的中文释义（简短，1-3个字或词组）
+- 三档各恰好一个
 
 只输出 JSON，不要解释。`;
 
-// 填空题模式：挖空一个关键词，给 3-4 个选项（1 对 2-3 错）
+// 填空题模式：挖空一个关键词，给 3-4 个带语感等级的选项（best 恰好一个）
 const BLANK_PROMPT = `你是一位英语表达教练。用户输入一句中文，请生成一道填空题：
-挖空句子中的一个关键词（用 ___ 表示），给出 1 个正确选项 + 2-3 个干扰项。
+挖空句子中的一个关键词（用 ___ 表示），给出 3~4 个选项，并标注每个选项的语感等级和中文释义。
 
 严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
-{"question":"我想吃一个橘子","sentence":"I'd like to ___ an orange.","correct":"have","options":["eat","get","take"],"zh":"(提示：表达"想要"的意思)"}
+{"question":"我想吃一个橘子","sentence":"I'd like to ___ an orange.","zh":"(提示：表达想要的意思)","options":[
+  {"word":"have","level":"best","meaning":"吃；享用"},
+  {"word":"eat","level":"acceptable","meaning":"吃"},
+  {"word":"take","level":"wrong","meaning":"拿取"}]}
 
 字段规则：
 - question: 中文原句
 - sentence: 挖空后的英文句子（用 ___ 表示空位，只挖 1 个关键词）
-- correct: 正确答案（单个词或短语）
-- options: 2-3 个干扰项（语法正确但语境不自然，或搭配不当）
 - zh: 可选的中文提示
+- options: 3~4 个候选词，每个标注 level 和 meaning：
+  - word: 候选词
+  - level: 语感等级（best：最自然、最常用，恰好 1 个；acceptable：语法正确但不够自然；wrong：搭配不当或不符合语法）
+  - meaning: 该词在此语境下的中文释义（简短，1-3 个字或词组）
 
 只输出 JSON，不要解释。`;
+
+// 场景表达模式：同一句中文 → 四种场景各自的表达
+const SCENE_PROMPT = `你是英语表达优化助手。用户输入一句中文，请根据不同场景给出对应的英语表达。
+
+场景说明：
+- chat：日常聊天（简单、自然、口语）
+- social_post：社交媒体（有感染力，可用感叹号）
+- formal：正式表达（礼貌、书面一点）
+- dating：轻松自然、略带情绪（像跟喜欢的人说话）
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"chat":"This place looks amazing.","social_post":"The views here are breathtaking!","formal":"The scenery here is truly beautiful.","dating":"It's really beautiful here."}
+
+四条表达都围绕用户输入的中文，风格各有侧重；必须是真实、能直接开口说的英语，不要中式英语。
+
+只输出 JSON，不要解释。`;
+
+// ================= 反馈系统 =================
+// 分工：等级（best/acceptable/wrong）由前端根据数据直接判定；AI 只负责写反馈文案
+
+// 反馈文案 Prompt：输入 {sentence, word, level} → 输出 {message}（不改等级）
+const FEEDBACK_PROMPT = `你是一个英语学习应用的反馈系统（类似多邻国）。根据给定的等级，为学习者生成一条反馈文案。
+
+等级（由系统给定，不要改变）：
+- best：选的是最自然、最常用的表达
+- acceptable：可以用，但不够自然 / 语气不对
+- wrong：不符合语法或语义
+
+规则：
+- best → 简短鼓励（10 字以内）
+- acceptable → 提醒语气差异（15 字以内）
+- wrong → 简单说明问题（20 字以内）
+- 语气自然、口语化，轻松一点
+- message 用中文写（可以夹带被比较的英文单词本身，但不要出现整句英文）
+
+输入格式：
+{"sentence":"Let's ___ out tonight.","word":"dine","level":"acceptable"}
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"message":"不算错，但 'dine' 听起来更正式一点。"}
+
+只输出 JSON。`;
+
+// 解释说明 Prompt（反向训练用）：对比两个表达的差异
+const EXPLAIN_PROMPT = `你是英语学习应用的讲解助手。对比两个表达，解释它们的差异。
+
+规则：
+- 简短（30 字以内），只指出最关键的区别
+- 偏口语理解，像朋友聊天一样说人话
+- explanation 用中文写（可以夹带英文表达片段本身）
+
+输入：{"best":"The views here are breathtaking.","wrong":"The scenery here is very beautiful."}
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"explanation":"'very beautiful' 太平淡，母语者更喜欢用 'breathtaking' 这种有画面的词。"}
+
+只输出 JSON。`;
 
 const KIND_TAG = { simple: "基础例句", natural: "自然例句", native: "地道例句" };  // 查词模式的标签
 const SENT_TAG = { simple: "基础表达", natural: "更自然的说法", native: "地道表达" }; // 整句模式的标签
@@ -775,8 +947,8 @@ function isWordQuery(t) {
 const VIA_PROXY = location.protocol.startsWith("http") &&
                   /^(localhost|127\.0\.0\.1|\[::1\])/i.test(location.hostname);
 
-// 调用 DeepSeek API（通用函数）
-async function callDeepSeekAPI(systemPrompt, userText) {
+// 调用 DeepSeek API（通用函数）；opts.maxTokens：反馈文案/解释这类短任务限制回复长度，保证轻量快速
+async function callDeepSeekAPI(systemPrompt, userText, opts) {
   const target = VIA_PROXY ? "/api" : apiEndpoint();
   const headers = {
     "Content-Type": "application/json",
@@ -784,18 +956,21 @@ async function callDeepSeekAPI(systemPrompt, userText) {
   };
   if (VIA_PROXY) headers["X-Upstream-URL"] = apiEndpoint();
 
+  const body = {
+    model: CFG.model,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userText }
+    ],
+    temperature: 1.3,
+    stream: false
+  };
+  if (opts && opts.maxTokens) body.max_tokens = opts.maxTokens;
+
   const res = await fetch(target, {
     method: "POST",
     headers,
-    body: JSON.stringify({
-      model: CFG.model,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userText }
-      ],
-      temperature: 1.3,
-      stream: false
-    })
+    body: JSON.stringify(body)
   });
 
   if (!res.ok) {
@@ -858,32 +1033,217 @@ async function callDeepSeek(text, isWord) {
   let replace = null;
   const rep = obj.replace;
   if (rep && typeof rep === "object") {
-    const words = (Array.isArray(rep.words) ? rep.words : [])
-      .filter(w => typeof w === "string" && w.trim())
-      .slice(0, 4);
-    if (typeof rep.pattern === "string" && rep.pattern.indexOf("___") >= 0 && words.length) {
-      replace = { pattern: rep.pattern, zh: rep.zh || "", words: words };
+    // 可替换词选项：带语感等级（best/acceptable/wrong），由前端据此定级
+    const options = normalizeOptions((Array.isArray(rep.options) ? rep.options : []).slice(0, 4));
+    if (typeof rep.pattern === "string" && rep.pattern.indexOf("___") >= 0 && options.length) {
+      replace = { pattern: rep.pattern, zh: rep.zh || "", options: options };
     }
   }
   return { list, word: obj.word || null, definition: obj.definition || null, replace };
 }
 
-// 选择题 API 调用
+// 选择题 API 调用（3 个选项，best/acceptable/wrong 各一）
 async function generateChoiceQuiz(text) {
   const obj = await callDeepSeekAPI(CHOICE_PROMPT, text);
-  if (!obj.question || !obj.correct || !Array.isArray(obj.options)) {
+  const options = normalizeOptions(obj.options);
+  if (!obj.question || options.length < 2) {
     throw new Error("选择题格式错误");
   }
-  return obj;
+  return { question: obj.question, options: options };
 }
 
-// 填空题 API 调用
+// 填空题 API 调用（3~4 个带等级的选项）
 async function generateBlankQuiz(text) {
   const obj = await callDeepSeekAPI(BLANK_PROMPT, text);
-  if (!obj.question || !obj.sentence || !obj.correct || !Array.isArray(obj.options)) {
+  const options = normalizeOptions(obj.options);
+  if (!obj.question || !obj.sentence || options.length < 2) {
     throw new Error("填空题格式错误");
   }
-  return obj;
+  return { question: obj.question, sentence: obj.sentence, zh: obj.zh || "", options: options };
+}
+
+// 场景表达 API 调用（一次生成四个场景的表达）
+async function generateScenes(text) {
+  const obj = await callDeepSeekAPI(SCENE_PROMPT, "中文：" + text);
+  const out = {};
+  SCENES.forEach(s => { out[s.key] = typeof obj[s.key] === "string" ? obj[s.key].trim() : ""; });
+  if (!out.chat && !out.social_post && !out.formal && !out.dating) {
+    throw new Error("场景表达格式错误");
+  }
+  return out;
+}
+
+// ================= 语感等级系统（前端判定，AI 不参与）=================
+// 统一数据结构：options = [{text, level}]；level 只允许 best / acceptable / wrong
+const LEVELS = ["best", "acceptable", "wrong"];
+const LEVEL_FB_CLS = { best: "correct-fb", acceptable: "maybe-fb", wrong: "wrong-fb" };
+const LEVEL_BTN_CLS = { best: "correct", acceptable: "maybe", wrong: "wrong" };
+const LEVEL_ICON = { best: "✔", acceptable: "⚠", wrong: "✖" };  // 反馈条图标：绿✔ / 黄⚠ / 红✖
+
+// 规范化选项数据：过滤空项，保证每项有合法 level，且至少一个 best（缺则第一个提升为 best）
+function normalizeOptions(raw) {
+  const opts = [];
+  (Array.isArray(raw) ? raw : []).forEach(o => {
+    if (!o) return;
+    const text = String(o.word || o.text || "").trim();
+    if (!text) return;
+    const level = LEVELS.indexOf(o.level) >= 0 ? o.level : "acceptable";
+    const meaning = o.meaning || "";
+    opts.push({ text: text, level: level, word: text, meaning: meaning });
+  });
+  if (opts.length && !opts.some(o => o.level === "best")) opts[0].level = "best";
+  return opts;
+}
+
+// 前端查等级：找到同文案的选项取其 level；查不到按 acceptable
+function getLevel(text, options) {
+  const hit = (options || []).find(o => o.text === text);
+  return hit && LEVELS.indexOf(hit.level) >= 0 ? hit.level : "acceptable";
+}
+
+// 取最自然的那一项
+function bestOf(options) {
+  const hit = (options || []).find(o => o.level === "best");
+  return hit ? hit.text : (((options || [])[0] || {}).text || "");
+}
+
+// 本地兜底反馈文案（秒出；有 Key 时 AI 文案回来只替换文字，等级与配色不变）
+const FB_LOCAL = {
+  best: [
+    "不错，就是这个感觉！",
+    "答得好！",
+    "听起来很自然！",
+    "选得漂亮！",
+    "没问题，很地道！",
+    "就是这个！"
+  ],
+  acceptable: [
+    "不算错，但这里用 '{best}' 更自然。",
+    "也可以用，不过 '{best}' 听起来更顺。",
+    "'{user}' 可以，但这里 '{best}' 更自然。"
+  ],
+  wrong: [
+    "差一点！这里不适合用 '{user}'，换成 '{best}' 吧。",
+    "嗯，'{user}' 用在这里不对，用 '{best}' 更好。",
+    "'{user}' 和这句话不搭，试试 '{best}'。"
+  ]
+};
+function pickLocalFeedback(level, userWord, bestWord) {
+  return shuffle(FB_LOCAL[level])[0]
+    .replace(/\{user\}/g, userWord)
+    .replace(/\{best\}/g, bestWord);
+}
+
+// 解释说明的本地兜底（反向训练：解释两个表达的差异）
+const EXPLAIN_LOCAL = {
+  acceptable: [
+    "'{user}' 也能用，但 '{best}' 更贴近母语者的说法。",
+    "意思都对，不过 '{best}' 听起来更自然。"
+  ],
+  wrong: [
+    "'{user}' 有中式英语的味道，'{best}' 才自然。",
+    "'{user}' 这句母语者一般不这么说，参考 '{best}'。"
+  ]
+};
+function pickLocalExplain(level, userText, bestText) {
+  return shuffle(EXPLAIN_LOCAL[level] || EXPLAIN_LOCAL.wrong)[0]
+    .replace(/\{user\}/g, userText)
+    .replace(/\{best\}/g, bestText);
+}
+
+// 渲染反馈条：level 决定图标，msg=点评文案，answer=展示的最佳表达（可省略）
+function renderFeedback(box, level, msg, answer) {
+  box.textContent = "";
+  const p = document.createElement("div");
+  p.className = "fb-msg";
+  const ico = document.createElement("span");
+  ico.className = "fb-ico";
+  ico.textContent = LEVEL_ICON[level] || "";
+  const t = document.createElement("span");
+  t.className = "fb-text";
+  t.textContent = msg;
+  p.appendChild(ico);
+  p.appendChild(t);
+  box.appendChild(p);
+  if (answer) {
+    const a = document.createElement("div");
+    a.className = "answer";
+    a.textContent = answer;
+    box.appendChild(a);
+  }
+}
+
+// 渲染/更新解释行（反向训练）
+function renderExplain(box, text) {
+  let el = box.querySelector(".fb-explain");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "fb-explain";
+    box.appendChild(el);
+  }
+  el.textContent = text;
+}
+
+// AI 反馈文案调用：只生成文案（等级由前端从数据直接给定）
+async function generateFeedbackText(info) {
+  const obj = await callDeepSeekAPI(FEEDBACK_PROMPT, JSON.stringify(info), { maxTokens: 80 });
+  if (typeof obj.message !== "string" || !obj.message.trim()) throw new Error("反馈文案格式错误");
+  return obj.message.trim();
+}
+
+// AI 解释调用：两个表达的差异（反向训练）
+async function generateExplanation(info) {
+  const obj = await callDeepSeekAPI(EXPLAIN_PROMPT, JSON.stringify(info), { maxTokens: 100 });
+  if (typeof obj.explanation !== "string" || !obj.explanation.trim()) throw new Error("解释格式错误");
+  return obj.explanation.trim();
+}
+
+// 防串题：每次作答递增；AI 异步返回后只允许最新一次的结果替换，避免上一题的内容盖住下一题
+let feedbackSeq = 0;
+
+// 有 Key 时用 AI 文案替换本地兜底；失败/无 Key 保持本地文案（等级与配色始终不变）
+async function upgradeFeedback(box, seq, info) {
+  if (!CFG.key) return;
+  try {
+    const msg = await generateFeedbackText(info);
+    if (seq !== feedbackSeq) return;  // 已换题/重新作答，丢弃过期文案
+    const t = box.querySelector(".fb-text");
+    if (t) t.textContent = msg;
+  } catch (e) {
+    // 失败不打扰答题，保留本地兜底文案
+  }
+}
+
+// 有 Key 时用 AI 解释替换本地兜底（反向训练）
+async function upgradeExplain(box, seq, info) {
+  if (!CFG.key) return;
+  try {
+    const exp = await generateExplanation(info);
+    if (seq !== feedbackSeq) return;
+    renderExplain(box, exp);
+  } catch (e) {}
+}
+
+// ================= 用户数据埋点（阶段4：本地记录，为后续成长系统/付费能力做准备）=================
+// 记录形如 {user_id, action, word, level, timestamp}；只存在本机，不做 UI
+function trackEvent(action, data) {
+  try {
+    let uid = localStorage.getItem("eng_uid");
+    if (!uid) {
+      uid = "u_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      localStorage.setItem("eng_uid", uid);
+    }
+    const list = JSON.parse(localStorage.getItem("eng_events") || "[]");
+    list.push(Object.assign({
+      user_id: uid,
+      action: action,
+      timestamp: Math.floor(Date.now() / 1000)
+    }, data || {}));
+    while (list.length > 500) list.shift();  // 只保留最近 500 条，防止无限增长
+    localStorage.setItem("eng_events", JSON.stringify(list));
+  } catch (e) {
+    // 埋点失败不影响使用
+  }
 }
 
 // ================= 演示兜底（未填 Key 时用）=================
@@ -1047,61 +1407,116 @@ const POOL = [
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// 选择题演示数据（未填 Key 时用）
+// 选择题演示数据（未填 Key 时用）：3 个选项，best / acceptable / wrong 各一
 const choiceDemo = [
   {
     question: "我想吃一个橘子",
-    correct: "I'd like to have an orange.",
-    options: ["I want to eat orange.", "I want eating an orange.", "I'm wanting eat orange."]
+    options: [
+      { text: "I'd like to have an orange.", level: "best", keyword: "have", meaning: "吃；享用" },
+      { text: "I want to eat an orange.", level: "acceptable", keyword: "want to", meaning: "想要" },
+      { text: "I want eating an orange.", level: "wrong", keyword: "want eating", meaning: "想吃（语法错）" }
+    ]
   },
   {
     question: "你今天看起来很累",
-    correct: "You look really tired today.",
-    options: ["You look like very tired.", "You are look very tired.", "You look very tire today."]
+    options: [
+      { text: "You look really tired today.", level: "best", keyword: "look", meaning: "看起来" },
+      { text: "You seem to be very tired today.", level: "acceptable", keyword: "seem to be", meaning: "似乎" },
+      { text: "You look like very tired today.", level: "wrong", keyword: "look like", meaning: "看起来像（搭配错）" }
+    ]
   },
   {
     question: "我明天要早起",
-    correct: "I've got an early start tomorrow.",
-    options: ["Tomorrow I must early get up.", "I must get up early in tomorrow.", "Tomorrow I need early wake up."]
+    options: [
+      { text: "I've got an early start tomorrow.", level: "best", keyword: "early start", meaning: "早起的开始" },
+      { text: "I need to get up early tomorrow.", level: "acceptable", keyword: "get up early", meaning: "早起" },
+      { text: "Tomorrow I must early get up.", level: "wrong", keyword: "early get up", meaning: "早起（语序错）" }
+    ]
   },
   {
     question: "帮我一个忙好吗",
-    correct: "Can you do me a favor?",
-    options: ["Can you help me a small thing?", "Can you make me a help?", "You can help me one thing?"]
+    options: [
+      { text: "Can you do me a favor?", level: "best", keyword: "do me a favor", meaning: "帮忙" },
+      { text: "Could you help me with something?", level: "acceptable", keyword: "help me", meaning: "帮助我" },
+      { text: "Can you help me a small thing?", level: "wrong", keyword: "help me a thing", meaning: "帮我一件事（搭配错）" }
+    ]
   }
 ];
 
-// 填空题演示数据（未填 Key 时用）
+// 填空题演示数据（未填 Key 时用）：选项带语感等级和中文释义
 const blankDemo = [
   {
     question: "我想吃一个橘子",
     sentence: "I'd like to ___ an orange.",
-    correct: "have",
-    options: ["eat", "get", "take"],
-    zh: "(提示：表达「想要」的意思)"
+    zh: "(提示：表达「想要」的意思)",
+    options: [
+      { word: "have", level: "best", meaning: "吃；享用" },
+      { word: "eat", level: "acceptable", meaning: "吃" },
+      { word: "get", level: "acceptable", meaning: "拿到" },
+      { word: "take", level: "wrong", meaning: "拿取" }
+    ]
   },
   {
     question: "这双鞋穿着很舒服",
-    sentence: "These shoes feel ___ on my feet.",
-    correct: "amazing",
-    options: ["comfortable", "good", "nice"],
-    zh: "(提示：选择最地道的表达)"
+    sentence: "These shoes are so ___.",
+    zh: "(提示：形容穿着感受的形容词)",
+    options: [
+      { word: "comfortable", level: "best", meaning: "舒适的" },
+      { word: "amazing", level: "acceptable", meaning: "很棒的" },
+      { word: "comfort", level: "wrong", meaning: "舒适（名词）" }
+    ]
   },
   {
     question: "我们好久没见了",
     sentence: "We haven't ___ in ages!",
-    correct: "caught up",
-    options: ["met", "seen", "talked"],
-    zh: "(提示：表达「叙旧、聊天」)"
+    zh: "(提示：表达「叙旧、聊天」)",
+    options: [
+      { word: "caught up", level: "best", meaning: "叙旧" },
+      { word: "met", level: "acceptable", meaning: "见面" },
+      { word: "talked", level: "acceptable", meaning: "聊天" },
+      { word: "seen", level: "wrong", meaning: "看见" }
+    ]
   },
   {
     question: "外面下雨了",
     sentence: "It's ___ out there.",
-    correct: "pouring",
-    options: ["raining", "rainy", "rain"],
-    zh: "(提示：表达「下大雨」)"
+    zh: "(提示：表达「下大雨」)",
+    options: [
+      { word: "pouring", level: "best", meaning: "倾盆大雨" },
+      { word: "raining", level: "acceptable", meaning: "下雨" },
+      { word: "rainy", level: "acceptable", meaning: "多雨的" },
+      { word: "rain", level: "wrong", meaning: "雨（名词）" }
+    ]
   }
 ];
+
+// 场景表达（阶段2）：四种场景 + 演示数据（未填 Key 时用）
+const SCENES = [
+  { key: "chat", label: "日常聊天" },
+  { key: "social_post", label: "社交媒体" },
+  { key: "formal", label: "正式表达" },
+  { key: "dating", label: "轻松约会" }
+];
+const sceneDemo = {
+  "这里的风景真美": {
+    chat: "This place looks amazing.",
+    social_post: "The views here are breathtaking!",
+    formal: "The scenery here is truly beautiful.",
+    dating: "It's really beautiful here."
+  },
+  "我想吃一个橘子": {
+    chat: "I really want an orange.",
+    social_post: "Craving an orange right now!",
+    formal: "I would like to have an orange.",
+    dating: "I could really go for an orange right now."
+  },
+  "我明天要早起": {
+    chat: "I have to get up early tomorrow.",
+    social_post: "Early start tomorrow — wish me luck!",
+    formal: "I have an early start tomorrow.",
+    dating: "Early night for me — big day tomorrow."
+  }
+};
 
 // 演示模式的单词库（未填 Key 时查词用）
 const wordDemo = {
@@ -1113,7 +1528,11 @@ const wordDemo = {
       { t: "地道例句", en: "An apple a day keeps the doctor away." }
     ],
     replace: { pattern: "I eat an ___ every day.", zh: "我每天吃一个…。",
-               words: ["apple", "orange", "egg"] }
+               options: [
+                 { word: "apple", level: "best" },
+                 { word: "orange", level: "acceptable" },
+                 { word: "egg", level: "acceptable" }
+               ] }
   },
   "猫": {
     word: "cat", definition: "n. 猫",
@@ -1123,7 +1542,11 @@ const wordDemo = {
       { t: "地道例句", en: "The cat's out of the bag now." }
     ],
     replace: { pattern: "My ___ sleeps on the sofa all day.", zh: "我的…整天睡沙发。",
-               words: ["cat", "dog", "hamster"] }
+               options: [
+                 { word: "cat", level: "best" },
+                 { word: "dog", level: "acceptable" },
+                 { word: "hamster", level: "acceptable" }
+               ] }
   },
   "跑步": {
     word: "run / jog", definition: "v. 跑步；慢跑",
@@ -1133,7 +1556,11 @@ const wordDemo = {
       { t: "地道例句", en: "I'm training for a 10K these days." }
     ],
     replace: { pattern: "I go for a ___ every morning.", zh: "我每天早上都去…。",
-               words: ["jog", "run", "walk"] }
+               options: [
+                 { word: "jog", level: "best" },
+                 { word: "run", level: "acceptable" },
+                 { word: "walk", level: "acceptable" }
+               ] }
   },
   "开心": {
     word: "happy", definition: "adj. 高兴的；开心的",
@@ -1143,7 +1570,11 @@ const wordDemo = {
       { t: "地道例句", en: "I'm on cloud nine right now." }
     ],
     replace: { pattern: "I'm really ___ today.", zh: "我今天真的很…。",
-               words: ["happy", "cheerful", "upbeat"] }
+               options: [
+                 { word: "happy", level: "best" },
+                 { word: "cheerful", level: "acceptable" },
+                 { word: "upbeat", level: "acceptable" }
+               ] }
   },
   "咖啡": {
     word: "coffee", definition: "n. 咖啡",
@@ -1153,7 +1584,11 @@ const wordDemo = {
       { t: "地道例句", en: "I can't function without my morning coffee." }
     ],
     replace: { pattern: "Let's grab a ___ sometime.", zh: "改天一起去喝杯…吧。",
-               words: ["coffee", "tea", "smoothie"] }
+               options: [
+                 { word: "coffee", level: "best" },
+                 { word: "tea", level: "acceptable" },
+                 { word: "smoothie", level: "acceptable" }
+               ] }
   },
   "开心地学习": {
     word: "learn happily", definition: "adv.+v. 开心地学习",
@@ -1163,7 +1598,11 @@ const wordDemo = {
       { t: "地道例句", en: "Make learning a habit and it'll never feel like a chore." }
     ],
     replace: { pattern: "I want to ___ English in a fun way.", zh: "我想用好玩的方式…英语。",
-               words: ["learn", "study", "pick up"] }
+               options: [
+                 { word: "learn", level: "best" },
+                 { word: "study", level: "acceptable" },
+                 { word: "pick up", level: "acceptable" }
+               ] }
   }
 };
 
@@ -1191,6 +1630,17 @@ async function demoTranslate(text, isWord) {
     ],
     isDemo: true
   };
+}
+
+// 场景表达演示数据：收在词条里的直接返回，否则给占位提示
+async function demoScenes(text) {
+  await delay(600 + Math.random() * 400);
+  if (sceneDemo[text]) return sceneDemo[text];
+  const placeholder = {};
+  SCENES.forEach(s => {
+    placeholder[s.key] = "(演示模式) 接入 API 后，这里会显示适合「" + s.label + "」的表达";
+  });
+  return placeholder;
 }
 
 async function translate(text, isWord) {
@@ -1297,6 +1747,7 @@ const rememberModeEl = document.getElementById("rememberMode");
 
 // 练习模式相关元素
 const viewMode = document.getElementById("viewMode");
+const sceneMode = document.getElementById("sceneMode");
 const choiceMode = document.getElementById("choiceMode");
 const blankMode = document.getElementById("blankMode");
 const modeButtons = document.querySelectorAll(".mode-btn");
@@ -1320,6 +1771,7 @@ function switchMode(mode) {
 
   // 切换显示的内容区域
   viewMode.style.display = mode === "view" ? "block" : "none";
+  sceneMode.classList.toggle("show", mode === "scene");
   choiceMode.classList.toggle("show", mode === "choice");
   blankMode.classList.toggle("show", mode === "blank");
 
@@ -1328,6 +1780,8 @@ function switchMode(mode) {
     loadChoiceQuestion();
   } else if (mode === "blank") {
     loadBlankQuestion();
+  } else if (mode === "scene") {
+    sceneInputEl.focus();
   }
 }
 
@@ -1603,8 +2057,8 @@ function hideError() {
 
 // 生成一张结果卡片：label=左上标签，speakText=朗读内容，mainText=正文，
 // zhText=可选小字，cls=配色类（def/lv-simple/lv-natural/lv-native/lv-replace），
-// chips=可替换词按钮列表（点击朗读）
-function appendCard(label, speakText, mainText, zhText, cls, chips) {
+// chipOptions=可替换词选项 [{text, level}]（点击填入 ___、朗读并立即按等级反馈）
+function appendCard(label, speakText, mainText, zhText, cls, chipOptions) {
   const div = document.createElement("div");
   div.className = "result" + (cls ? " " + cls : "");
   const head = document.createElement("div");
@@ -1617,13 +2071,15 @@ function appendCard(label, speakText, mainText, zhText, cls, chips) {
   btn.type = "button";
   btn.title = "朗读";
   btn.innerHTML = SPEAK_ICON;
-  btn.addEventListener("click", () => speak(speakText));
+  let curSpeak = speakText;  // 当前朗读内容：填入词后变为完整句
+  btn.addEventListener("click", () => speak(curSpeak));
   head.appendChild(tag);
   head.appendChild(btn);
   div.appendChild(head);
 
   const en = document.createElement("div");
   en.className = "en";
+  const blanks = [];  // ___ 空位元素，点击候选词时填入
   // 正文中的 ___ 空位拆出来高亮（如可替换词的填空句）
   String(mainText).split("___").forEach((part, i, arr) => {
     if (part) {
@@ -1636,30 +2092,62 @@ function appendCard(label, speakText, mainText, zhText, cls, chips) {
       const b = document.createElement("span");
       b.className = "blank";
       b.textContent = "___";
+      blanks.push(b);
       en.appendChild(b);
     }
   });
   div.appendChild(en);
 
-  if (zhText) {
-    const zh = document.createElement("div");
-    zh.className = "zh";
-    zh.textContent = zhText;
-    div.appendChild(zh);
-  }
-  if (Array.isArray(chips) && chips.length) {
+  const zhEl = document.createElement("div");
+  zhEl.className = "zh";
+  zhEl.textContent = zhText || "";
+  div.appendChild(zhEl);
+
+  if (Array.isArray(chipOptions) && chipOptions.length) {
     const wrap = document.createElement("div");
     wrap.className = "chips";
-    chips.forEach(w => {
+    const best = bestOf(chipOptions);  // 最贴切的词：标绿用
+    // 点击后的语感反馈条（默认隐藏）
+    const fb = document.createElement("div");
+    fb.className = "quiz-feedback";
+    const chipBtns = [];
+    chipOptions.forEach(opt => {
+      const w = opt.text;
       const c = document.createElement("button");
       c.className = "chip";
       c.type = "button";
       c.textContent = w;
-      c.title = "朗读：" + w;
-      c.addEventListener("click", () => speak(w));
+      c.title = "点击填入句子";
+      c.addEventListener("click", () => {
+        // 填空执行器：把选中的词替换进 ___，显示并朗读完整句子
+        blanks.forEach(b => { b.textContent = w; b.classList.add("filled"); });
+        curSpeak = String(mainText).split("___").join(w);
+        speak(curSpeak);
+
+        // 更新中文注释：显示填入后的完整句子的中文翻译
+        const filledSentence = String(mainText).split("___").join(w);
+        zhEl.textContent = zhText ? zhText + " → " + filledSentence : filledSentence;
+
+        // 语感等级：前端直接从数据里查（best/acceptable/wrong），点击即出，不依赖网络
+        const level = getLevel(w, chipOptions);
+        const seq = ++feedbackSeq;
+        const bestSentence = String(mainText).split("___").join(best);
+        chipBtns.forEach(el => el.classList.remove("correct", "maybe", "wrong"));
+        c.classList.add(LEVEL_BTN_CLS[level]);
+        chipBtns.forEach(el => {  // 始终标出最贴切的词
+          if (el.textContent === best) el.classList.add("correct");
+        });
+        fb.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
+        renderFeedback(fb, level, pickLocalFeedback(level, w, best), level === "best" ? null : bestSentence);
+        // AI 只写反馈文案（不改等级/配色）
+        upgradeFeedback(fb, seq, { sentence: mainText, word: w, level: level });
+        trackEvent("select_word", { sentence: mainText, word: w, level: level });
+      });
+      chipBtns.push(c);
       wrap.appendChild(c);
     });
     div.appendChild(wrap);
+    div.appendChild(fb);
   }
   results.appendChild(div);
 }
@@ -1769,10 +2257,13 @@ async function run() {
     r.list.forEach((item, i) => {
       appendCard(item.t, item.en, item.en, null, LV_CLS[i] || "");
     });
-    // ③ 可替换词卡（青色）：填空句 + 可点击朗读的候选词
+    // ③ 可替换词卡（青色）：填空句 + 带等级的候选词（点击填入 ___、朗读并按等级反馈）
     if (r.replace) {
-      appendCard("可替换词", r.replace.pattern, r.replace.pattern,
-                 r.replace.zh || "", "lv-replace", r.replace.words);
+      const options = normalizeOptions(r.replace.options);
+      if (options.length) {
+        appendCard("可替换词", r.replace.pattern, r.replace.pattern,
+                   r.replace.zh || "", "lv-replace", options);
+      }
     }
     if (r.isDemo) {
       demoNote.textContent =
@@ -1875,18 +2366,29 @@ async function loadChoiceQuestion(customText) {
     }
 
     currentChoiceData = data;
-    choiceQuestion.textContent = data.question;
+    // 中文题目添加悬停显示英文（取最佳答案）
+    const bestAnswer = bestOf(data.options);
+    choiceQuestion.innerHTML = "";
+    const span = document.createElement("span");
+    span.className = "hover-translation";
+    span.textContent = data.question;
+    span.setAttribute("data-translation", bestAnswer);
+    choiceQuestion.appendChild(span);
 
-    // 打乱选项顺序（正确答案 + 3个错误选项）
-    const allOptions = [data.correct, ...data.options];
-    const shuffled = shuffle(allOptions);
+    // 打乱选项顺序（3 句表达，best / acceptable / wrong 各一，等级藏在数据里）
+    const shuffled = shuffle(data.options);
 
     // 渲染选项
     shuffled.forEach(option => {
       const btn = document.createElement("button");
-      btn.className = "quiz-option";
-      btn.textContent = option;
-      btn.addEventListener("click", () => checkChoiceAnswer(option, btn));
+      btn.className = "quiz-option hover-translation";
+      btn.textContent = option.text;
+      // 选项悬停显示关键词的中文释义
+      const translation = option.keyword && option.meaning
+        ? `${option.keyword} - ${option.meaning}`
+        : data.question;
+      btn.setAttribute("data-translation", translation);
+      btn.addEventListener("click", () => checkChoiceAnswer(option.text, btn));
       choiceOptions.appendChild(btn);
     });
 
@@ -1900,29 +2402,36 @@ function checkChoiceAnswer(selected, btn) {
   const choiceOptions = document.getElementById("choiceOptions");
   const choiceFeedback = document.getElementById("choiceFeedback");
   const allOptions = choiceOptions.querySelectorAll(".quiz-option");
+  const options = currentChoiceData.options;
 
   // 禁用所有选项
   allOptions.forEach(opt => opt.classList.add("disabled"));
 
-  if (selected === currentChoiceData.correct) {
-    // 答对
-    btn.classList.add("correct");
-    choiceFeedback.className = "quiz-feedback show correct-fb";
-    choiceFeedback.innerHTML = "✅ 太棒了！完全正确！";
-    speak(currentChoiceData.correct);
-  } else {
-    // 答错
-    btn.classList.add("wrong");
-    // 高亮正确答案
+  // 语感等级：前端直接从数据里查，点击即出（AI 不参与判断）
+  const level = getLevel(selected, options);
+  const best = bestOf(options);
+  const seq = ++feedbackSeq;
+
+  btn.classList.add(LEVEL_BTN_CLS[level]);
+  if (level !== "best") {
+    // 高亮最自然的那句
     allOptions.forEach(opt => {
-      if (opt.textContent === currentChoiceData.correct) {
-        opt.classList.add("correct");
-      }
+      if (opt.textContent === best) opt.classList.add("correct");
     });
-    choiceFeedback.className = "quiz-feedback show wrong-fb";
-    choiceFeedback.innerHTML = "❌ 不对哦<div class='answer'>正确答案：" + currentChoiceData.correct + "</div>";
-    speak(currentChoiceData.correct);  // 答错也朗读正确答案，方便听正确发音
   }
+
+  choiceFeedback.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
+  renderFeedback(choiceFeedback, level, pickLocalFeedback(level, selected, best), level === "best" ? null : best);
+  if (level !== "best") {
+    // 反向训练：解释两句的差异（本地先出，AI 回来替换）
+    renderExplain(choiceFeedback, pickLocalExplain(level, selected, best));
+    upgradeExplain(choiceFeedback, seq, { best: best, wrong: selected });
+  }
+  speak(best);
+
+  // AI 只写反馈文案（等级/配色不变）
+  upgradeFeedback(choiceFeedback, seq, { sentence: best, word: selected, level: level });
+  trackEvent("select_word", { sentence: currentChoiceData.question, word: selected, level: level });
 }
 
 document.getElementById("choiceNext").addEventListener("click", () => loadChoiceQuestion());
@@ -1945,6 +2454,7 @@ async function loadBlankQuestion(customText) {
 
   blankOptions.innerHTML = "";
   blankFeedback.classList.remove("show");
+  currentBlankData = null;  // 加载期间朗读按钮不读旧题
 
   try {
     let data;
@@ -1955,12 +2465,14 @@ async function loadBlankQuestion(customText) {
         return;
       }
       blankQuestion.textContent = "生成中...";
+      blankSentence.textContent = "";  // 清掉占位示例句，避免误认成正在生成的题目
       data = await generateBlankQuiz(customText);
     } else {
       // 使用演示数据或随机句子
       if (CFG.key) {
         const randomSentence = POOL[Math.floor(Math.random() * POOL.length)];
         blankQuestion.textContent = "生成中...";
+        blankSentence.textContent = "";  // 清掉上一题的句子，等待新题时不留旧内容
         data = await generateBlankQuiz(randomSentence);
       } else {
         data = blankDemo[currentBlankIndex % blankDemo.length];
@@ -1968,19 +2480,35 @@ async function loadBlankQuestion(customText) {
     }
 
     currentBlankData = data;
-    blankQuestion.textContent = data.question + (data.zh ? " " + data.zh : "");
-    blankSentence.textContent = data.sentence;
+    // 中文题目添加悬停显示英文完整句
+    const bestAnswer = data.sentence.split("___").join(bestOf(data.options));
+    blankQuestion.innerHTML = "";
+    const span = document.createElement("span");
+    span.className = "hover-translation";
+    span.textContent = data.question + (data.zh ? " " + data.zh : "");
+    span.setAttribute("data-translation", bestAnswer);
+    blankQuestion.appendChild(span);
 
-    // 打乱选项顺序（正确答案 + 2-3个错误选项）
-    const allOptions = [data.correct, ...data.options];
-    const shuffled = shuffle(allOptions);
+    // 英文句子添加悬停显示中文
+    blankSentence.innerHTML = "";
+    const sentenceSpan = document.createElement("span");
+    sentenceSpan.className = "hover-translation";
+    sentenceSpan.textContent = data.sentence;
+    sentenceSpan.setAttribute("data-translation", data.question);
+    blankSentence.appendChild(sentenceSpan);
+
+    // 打乱选项顺序（3~4 个候选词，等级藏在数据里）
+    const shuffled = shuffle(data.options);
 
     // 渲染选项
     shuffled.forEach(option => {
       const btn = document.createElement("button");
-      btn.className = "quiz-option";
-      btn.textContent = option;
-      btn.addEventListener("click", () => checkBlankAnswer(option, btn));
+      btn.className = "quiz-option hover-translation";
+      btn.textContent = option.word;
+      // 选项悬停显示该词的中文释义
+      const meaning = option.meaning || option.word;
+      btn.setAttribute("data-translation", meaning);
+      btn.addEventListener("click", () => checkBlankAnswer(option.word, btn));
       blankOptions.appendChild(btn);
     });
 
@@ -1993,35 +2521,34 @@ async function loadBlankQuestion(customText) {
 function checkBlankAnswer(selected, btn) {
   const blankOptions = document.getElementById("blankOptions");
   const blankFeedback = document.getElementById("blankFeedback");
-  const blankSentence = document.getElementById("blankSentence");
   const allOptions = blankOptions.querySelectorAll(".quiz-option");
+  const data = currentBlankData;
 
   // 禁用所有选项
   allOptions.forEach(opt => opt.classList.add("disabled"));
 
-  // 显示填入结果
-  const filledSentence = currentBlankData.sentence.replace("___", selected);
+  // 语感等级：前端直接从数据里查，点击即出（AI 不参与判断）
+  const level = getLevel(selected, data.options);
+  const best = bestOf(data.options);
+  const seq = ++feedbackSeq;
+  // 填入结果（最佳=用户选的词，否则=应填的词）
+  const filledSentence = data.sentence.split("___").join(selected);
+  const bestSentence = data.sentence.split("___").join(best);
 
-  if (selected === currentBlankData.correct) {
-    // 答对
-    btn.classList.add("correct");
-    blankFeedback.className = "quiz-feedback show correct-fb";
-    blankFeedback.innerHTML = "✅ 完全正确！<div class='answer'>" + filledSentence + "</div>";
-    speak(filledSentence);
-  } else {
-    // 答错
-    btn.classList.add("wrong");
-    // 高亮正确答案
+  btn.classList.add(LEVEL_BTN_CLS[level]);
+  if (level !== "best") {
+    // 高亮最自然的那一项
     allOptions.forEach(opt => {
-      if (opt.textContent === currentBlankData.correct) {
-        opt.classList.add("correct");
-      }
+      if (opt.textContent === best) opt.classList.add("correct");
     });
-    const correctSentence = currentBlankData.sentence.replace("___", currentBlankData.correct);
-    blankFeedback.className = "quiz-feedback show wrong-fb";
-    blankFeedback.innerHTML = "❌ 不对哦<div class='answer'>正确答案：" + correctSentence + "</div>";
-    speak(correctSentence);  // 答错也朗读完整正确句，方便听正确发音
   }
+  blankFeedback.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
+  renderFeedback(blankFeedback, level, pickLocalFeedback(level, selected, best), level === "best" ? filledSentence : bestSentence);
+  speak(level === "best" ? filledSentence : bestSentence);
+
+  // AI 只写反馈文案（等级/配色不变）
+  upgradeFeedback(blankFeedback, seq, { sentence: data.sentence, word: selected, level: level });
+  trackEvent("select_word", { sentence: data.sentence, word: selected, level: level });
 }
 
 document.getElementById("blankNext").addEventListener("click", () => loadBlankQuestion());
@@ -2030,6 +2557,88 @@ document.getElementById("blankCustom").addEventListener("click", () => {
   if (text && text.trim()) {
     loadBlankQuestion(text.trim());
   }
+});
+
+// 题目句朗读：作答前空位读成停顿（不剧透答案），作答后读完整的最佳句子
+const blankSpeakBtn = document.getElementById("blankSpeak");
+blankSpeakBtn.innerHTML = SPEAK_ICON;
+blankSpeakBtn.addEventListener("click", () => {
+  if (!currentBlankData) return;
+  const data = currentBlankData;
+  const answered = document.getElementById("blankFeedback").classList.contains("show");
+  const text = answered
+    ? data.sentence.split("___").join(bestOf(data.options))
+    : data.sentence.replace(/_+/g, "……");
+  speak(text);
+});
+
+// ================= 场景表达模式（阶段2）=================
+// 一次生成四种场景的表达；Tab 切换只换显示（无刷新、不发请求）
+const sceneInputEl = document.getElementById("sceneInput");
+const sceneGoBtn = document.getElementById("sceneGo");
+const sceneLoadingEl = document.getElementById("sceneLoading");
+const scenePanelEl = document.getElementById("scenePanel");
+const sceneTabsEl = document.getElementById("sceneTabs");
+const sceneTextEl = document.getElementById("sceneText");
+const sceneZhEl = document.getElementById("sceneZh");
+const sceneTagEl = document.getElementById("sceneTag");
+const SCENE_LOADING_TEXT = sceneLoadingEl.textContent;
+
+let currentSceneData = null;   // {chat, social_post, formal, dating}
+let currentSceneKey = "chat";  // 当前显示的场景
+let sceneSourceText = "";      // 生成这次表达的中文原句
+
+function renderScenePanel() {
+  const data = currentSceneData || {};
+  const label = (SCENES.find(s => s.key === currentSceneKey) || {}).label || "";
+  sceneTagEl.textContent = label;
+  sceneTextEl.textContent = data[currentSceneKey] || "";
+  sceneZhEl.textContent = sceneSourceText ? "—— " + sceneSourceText : "";
+}
+
+// 切换场景 Tab：只换显示，不重新请求
+function setSceneTab(key) {
+  if (SCENES.every(s => s.key !== key)) return;
+  currentSceneKey = key;
+  sceneTabsEl.querySelectorAll(".scene-tab").forEach(b => {
+    b.classList.toggle("active", b.dataset.scene === key);
+  });
+  renderScenePanel();
+}
+
+async function runScene() {
+  const text = sceneInputEl.value.trim();
+  if (!text) {
+    sceneInputEl.focus();
+    return;
+  }
+  sceneGoBtn.disabled = true;
+  sceneLoadingEl.textContent = SCENE_LOADING_TEXT;
+  sceneLoadingEl.classList.add("show");
+  scenePanelEl.hidden = true;
+  try {
+    const data = CFG.key ? await generateScenes(text) : await demoScenes(text);
+    currentSceneData = data;
+    sceneSourceText = text;
+    setSceneTab("chat");  // 默认显示「日常聊天」
+    scenePanelEl.hidden = false;
+    sceneLoadingEl.classList.remove("show");
+    if (CFG.autoSpeak && data.chat) speak(data.chat);
+  } catch (err) {
+    sceneLoadingEl.textContent = "生成失败：" + err.message;  // 保留提示给用户看
+  } finally {
+    sceneGoBtn.disabled = false;
+  }
+}
+
+// 朗读按钮：读当前 Tab 显示的那句
+document.getElementById("sceneSpeak").innerHTML = SPEAK_ICON;
+document.getElementById("sceneSpeak").addEventListener("click", () => {
+  if (currentSceneData && currentSceneData[currentSceneKey]) speak(currentSceneData[currentSceneKey]);
+});
+sceneGoBtn.addEventListener("click", runScene);
+sceneTabsEl.querySelectorAll(".scene-tab").forEach(btn => {
+  btn.addEventListener("click", () => setSceneTab(btn.dataset.scene));
 });
 
 // 初始化：开启「记住模式」则恢复上次所在模式，否则从查看模式开始
