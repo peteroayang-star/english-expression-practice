@@ -284,12 +284,16 @@
   }
   textarea:focus { border-color: #667eea; }
   .row { display: flex; gap: 10px; margin-top: 12px; }
-  #go, #sceneGo {
+  /* 主按钮：满宽紫底（#treeGo 与 #go/#sceneGo 同为「输入 → 生成」按钮，必须一起写，
+     否则会退回浏览器默认样式，出现又小又灰的原生按钮） */
+  #go, #sceneGo, #treeGo {
     width: 100%; background: #667eea; color: #fff; font-weight: bold;
     border: none; border-radius: 10px; padding: 12px; font-size: 16px;
-    cursor: pointer; transition: opacity .2s;
+    font-family: inherit;
+    cursor: pointer; transition: opacity .2s, background .15s;
   }
-  #go:disabled, #sceneGo:disabled { opacity: .5; cursor: not-allowed; }
+  #go:hover, #sceneGo:hover, #treeGo:hover { background: #5a72e2; }
+  #go:disabled, #sceneGo:disabled, #treeGo:disabled { opacity: .5; cursor: not-allowed; }
   button.example { background: #f5f5f5; color: #555; font-size: 13px; padding: 8px; flex: 0 0 auto; border: none; border-radius: 6px; cursor: pointer; }
   button.example:hover { background: #e8e8e8; }
   .examples-wrap { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
@@ -379,8 +383,46 @@
   }
   .quiz-question .zh-text {
     font-size: 20px; color: #333; margin-bottom: 8px; font-weight: 500;
+    position: relative; cursor: help;
   }
   .quiz-question .hint { font-size: 13px; color: #999; }
+  /* 悬停翻译提示 */
+  .hover-translation {
+    position: relative; cursor: help;
+  }
+  .hover-translation::after {
+    content: attr(data-translation);
+    position: absolute; left: 50%; bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    background: rgba(35, 40, 70, .95); color: #fff;
+    padding: 8px 14px; border-radius: 8px; font-size: 14px;
+    white-space: nowrap; pointer-events: none;
+    opacity: 0; visibility: hidden;
+    transition: opacity .25s, visibility .25s;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, .2);
+    z-index: 1000;
+  }
+  .hover-translation::before {
+    content: ""; position: absolute; left: 50%; bottom: calc(100% + 2px);
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(35, 40, 70, .95);
+    pointer-events: none;
+    opacity: 0; visibility: hidden;
+    transition: opacity .25s, visibility .25s;
+    z-index: 1000;
+  }
+  .hover-translation:hover::after,
+  .hover-translation:hover::before {
+    opacity: 1; visibility: visible;
+  }
+  /* 选择题选项的悬停翻译 */
+  .quiz-option.hover-translation {
+    display: block; position: relative;
+  }
+  .quiz-option.hover-translation::after {
+    max-width: 400px; white-space: normal;
+  }
   /* 填空题题目句 + 朗读按钮 */
   .q-line { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 12px; }
   .quiz-options {
@@ -429,10 +471,11 @@
     flex: 0 0 auto; min-width: 120px; border: none; border-radius: 10px;
     padding: 12px 20px; font-size: 16px; cursor: pointer; transition: opacity .2s;
   }
-  #choiceNext, #blankNext {
+  /* 每个练习模式的「下一题」都用同一种紫底主按钮 */
+  #choiceNext, #blankNext, #dailyNext {
     background: #667eea; color: #fff; font-weight: bold;
   }
-  #choiceCustom, #blankCustom {
+  #choiceCustom, #blankCustom, #dailyOpenPath {
     background: #f5f5f5; color: #666;
   }
 
@@ -453,17 +496,452 @@
     margin-top: 8px; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,.12);
     font-size: 13px; line-height: 1.6;
   }
+
+  /* ============================================================
+     ▼ 增强优化新增样式（进度/反馈/表达树/错题本/每日路径/标签/分享）
+     统一放在文件末尾，避免与原有样式冲突
+     ============================================================ */
+
+  /* —— ① 顶部固定进度条（Duolingo 风格）—— */
+  #topBar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 90;
+    display: none; align-items: center; gap: 12px;
+    padding: 10px 18px;
+    background: rgba(255,255,255,.97);
+    -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px);
+    border-bottom: 1px solid #e7eaf5;
+    box-shadow: 0 2px 16px rgba(60,70,160,.08);
+  }
+  #topBar.show { display: flex; }
+  body.hasTopBar { padding-top: 96px; align-items: flex-start; }
+
+  .tb-progress { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; }
+  .tb-track {
+    flex: 1; height: 12px; background: #eceefa; border-radius: 999px;
+    overflow: hidden; min-width: 60px;
+  }
+  .tb-fill {
+    height: 100%; width: 0%; border-radius: 999px;
+    background: linear-gradient(90deg, #667eea, #8f7ce8);
+    transition: width .45s cubic-bezier(.22,1,.36,1);
+  }
+  .tb-fill.full { background: linear-gradient(90deg, #38c172, #6ee7a8); }
+  .tb-count {
+    flex: 0 0 auto; font-size: 13px; font-weight: 700; color: #5a6178;
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+
+  .tb-streak {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+    background: #fff7e6; border: 1px solid #ffd591; color: #d46b08;
+    border-radius: 999px; padding: 5px 12px; font-size: 14px; font-weight: 700;
+    font-variant-numeric: tabular-nums; transition: transform .18s, background .2s;
+  }
+  .tb-flame { font-size: 15px; line-height: 1; display: inline-block; }
+  .tb-streak.bump { animation: streakBump .5s ease; }
+  .tb-streak.bump .tb-flame { animation: flamePulse .5s ease; }
+  .tb-streak.broken {
+    background: #fff2f0; border-color: #ffccc7; color: #cf1322;
+    animation: streakBreak .5s ease;
+  }
+  @keyframes streakBump {
+    0% { transform: scale(1); } 40% { transform: scale(1.22); } 100% { transform: scale(1); }
+  }
+  @keyframes flamePulse {
+    0%, 100% { transform: scale(1) rotate(0); } 50% { transform: scale(1.35) rotate(-8deg); }
+  }
+  @keyframes streakBreak {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-5px); } 40% { transform: translateX(5px); }
+    60% { transform: translateX(-3px); } 80% { transform: translateX(3px); }
+  }
+
+  .tb-btn {
+    flex: 0 0 auto; position: relative; cursor: pointer;
+    background: #f4f5fb; border: 1px solid #e3e6f2; border-radius: 10px;
+    width: 40px; height: 36px; font-size: 16px; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: background .15s, border-color .15s, transform .08s;
+  }
+  .tb-btn:hover { background: #eaeefb; border-color: #c9d1f0; }
+  .tb-btn:active { transform: scale(.94); }
+  .tb-badge {
+    position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px;
+    padding: 0 5px; border-radius: 999px; background: #ff4d4f; color: #fff;
+    font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
+    box-shadow: 0 2px 6px rgba(255,77,79,.4);
+  }
+  .tb-badge[hidden] { display: none; }
+
+  @media (max-width: 640px) {
+    #topBar { padding: 8px 10px; gap: 7px; }
+    body.hasTopBar { padding-top: 88px; }
+    .tb-btn { width: 34px; height: 33px; font-size: 14px; }
+    .tb-count { font-size: 12px; }
+    .tb-streak { padding: 4px 9px; font-size: 13px; }
+  }
+
+  /* —— ② 反馈系统强化：对比句 / 错误类型 / 更自然的表达 —— */
+  .quiz-feedback { text-align: left; }
+  .quiz-feedback .fb-msg { display: flex; align-items: flex-start; gap: 4px; }
+  .quiz-feedback .fb-text { flex: 1; }
+  /* 答错的对比块：你的答案 → 正确说法 */
+  .fb-cmp {
+    margin-top: 10px; padding-top: 10px;
+    border-top: 1px dashed rgba(0,0,0,.14); font-size: 14px; line-height: 1.7;
+  }
+  .fb-cmp .cmp-row { display: flex; align-items: flex-start; gap: 7px; }
+  .fb-cmp .cmp-row + .cmp-row { margin-top: 5px; }
+  .fb-cmp .cmp-k {
+    flex: 0 0 auto; font-size: 11.5px; font-weight: 700; border-radius: 5px;
+    padding: 1px 6px; margin-top: 3px; white-space: nowrap;
+  }
+  .fb-cmp .cmp-row.user .cmp-k { background: rgba(255,77,79,.14); color: #cf1322; }
+  .fb-cmp .cmp-row.correct .cmp-k { background: rgba(82,196,26,.16); color: #389e0d; }
+  .fb-cmp .cmp-row.user .cmp-v { color: #a8261f; text-decoration: line-through; text-decoration-color: rgba(255,77,79,.5); }
+  .fb-cmp .cmp-row.correct .cmp-v { color: #237804; font-weight: 600; }
+  /* 错误原因标签（词汇 / 语法 / 语气 / 搭配） */
+  .fb-reason {
+    display: inline-block; margin-top: 9px; font-size: 12px; font-weight: 600;
+    background: rgba(0,0,0,.06); border-radius: 999px; padding: 3px 10px;
+  }
+  .fb-reason .rsn { opacity: .7; }
+  /* 答对时补充的「更自然的表达」 */
+  .fb-better {
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed rgba(0,0,0,.14);
+    font-size: 13.5px; line-height: 1.65;
+  }
+  .fb-better .bb-k { font-weight: 700; margin-right: 5px; }
+  .fb-better .bb-v { font-style: italic; }
+
+  /* —— 题目上的场景标签 —— */
+  .q-tags { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 9px; }
+  .q-tag {
+    font-size: 11.5px; font-weight: 600; border-radius: 999px; padding: 2px 9px;
+    background: #eef1fd; color: #5a6bc4; border: 1px solid #dde2f8;
+  }
+
+  /* —— ③ 表达树模式 —— */
+  .tree-wrap { margin-top: 4px; }
+  .tree-preview {
+    background: linear-gradient(135deg, #f7f9ff, #eef2fe);
+    border: 2px dashed #c9d3f5; border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 16px; min-height: 66px;
+  }
+  .tree-preview .tp-label {
+    font-size: 11.5px; font-weight: 700; color: #8a93bb; letter-spacing: .04em;
+    margin-bottom: 7px; text-transform: uppercase;
+  }
+  .tree-preview .tp-sentence { font-size: 19px; line-height: 1.6; color: #9aa1bb; }
+  .tree-preview .tp-sentence .slot {
+    display: inline-block; min-width: 54px; padding: 0 8px; margin: 0 2px;
+    border-bottom: 2px solid #b9c3ea; color: #b9c3ea; text-align: center;
+    font-size: 14px; border-radius: 4px 4px 0 0;
+  }
+  .tree-preview .tp-sentence .slot.filled {
+    color: #2b3150; font-weight: 700; border-bottom-color: #667eea;
+    background: #e6ebff; animation: slotIn .3s ease;
+  }
+  .tree-preview .tp-zh { font-size: 13px; color: #8a93bb; margin-top: 8px; }
+  @keyframes slotIn {
+    from { transform: translateY(-5px); opacity: .2; } to { transform: none; opacity: 1; }
+  }
+
+  .tree-step {
+    border: 1px solid #e8ebf4; border-radius: 12px; padding: 13px 15px;
+    margin-bottom: 11px; background: #fff; transition: border-color .2s, background .2s;
+  }
+  .tree-step.active { border-color: #b9c3ea; background: #fbfcff; box-shadow: 0 1px 8px rgba(102,126,234,.08); }
+  .tree-step.done { background: #f7fffd; border-color: #b5e8e8; }
+  .tree-step-label {
+    display: flex; align-items: center; gap: 8px; font-size: 13.5px;
+    font-weight: 700; color: #3f465c; margin-bottom: 10px;
+  }
+  .tree-step-label .ts-idx {
+    flex: 0 0 auto; width: 21px; height: 21px; border-radius: 50%;
+    background: #667eea; color: #fff; font-size: 12px; line-height: 21px;
+    text-align: center;
+  }
+  .tree-step.done .tree-step-label .ts-idx { background: #13c2c2; }
+  .tree-step-label .ts-picked { margin-left: auto; font-size: 12.5px; color: #08979c; font-weight: 600; }
+  .tree-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tree-opt {
+    background: #fff; border: 2px solid #e8e8e8; border-radius: 999px;
+    padding: 7px 15px; font-size: 14px; cursor: pointer; font-family: inherit;
+    transition: all .18s; display: inline-flex; align-items: center; gap: 6px;
+  }
+  .tree-opt:hover { border-color: #667eea; background: #f8f9ff; transform: translateY(-1px); }
+  .tree-opt .to-zh { font-size: 11.5px; color: #9aa0b0; }
+  .tree-opt.active {
+    background: #667eea; border-color: #667eea; color: #fff; font-weight: 700;
+  }
+  .tree-opt.active .to-zh { color: rgba(255,255,255,.8); }
+  .tree-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .tree-actions button {
+    flex: 1 1 auto; min-width: 130px; border: none; border-radius: 10px;
+    padding: 12px 18px; font-size: 15px; cursor: pointer; font-family: inherit;
+    transition: opacity .2s, background .15s;
+  }
+  #treeAgain { background: #667eea; color: #fff; font-weight: 700; }
+  #treeAgain:disabled { opacity: .5; cursor: not-allowed; }
+  #treeSpeak { background: #f5f5f5; color: #555; }
+  #treeSpeak:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* —— 通用弹层（错题本 / 每日路径 / 标签 / 分享 / 完成）—— */
+  .overlay {
+    display: none; position: fixed; inset: 0; z-index: 110;
+    background: rgba(24,28,48,.5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    padding: 24px; overflow-y: auto;
+  }
+  .overlay.open { display: flex; align-items: center; justify-content: center; }
+  .sheet {
+    width: 100%; max-width: 620px; height: min(660px, calc(100vh - 48px));
+    background: #fff; border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column;
+    box-shadow: 0 24px 70px rgba(24,20,60,.35); animation: popIn .16s ease;
+  }
+  .sheet-head {
+    flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+    padding: 17px 22px 13px; border-bottom: 1px solid #eef0f6;
+  }
+  .sheet-head .cfg-title { font-size: 17px; }
+  .sheet-close {
+    border: none; background: #f0f1f7; color: #7b8196; width: 30px; height: 30px;
+    border-radius: 50%; cursor: pointer; font-size: 16px; line-height: 1; flex: 0 0 auto;
+  }
+  .sheet-close:hover { background: #e4e6f0; color: #4a5070; }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 18px 22px 22px; }
+  .sheet-foot {
+    flex: 0 0 auto; padding: 13px 22px 17px; border-top: 1px solid #eef0f6;
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .sheet-foot button { flex: 1 1 auto; min-width: 120px; }
+  @media (max-width: 640px) {
+    .overlay { padding: 0; }
+    .sheet { height: 100vh; height: 100dvh; max-height: none; border-radius: 0; max-width: none; }
+    .sheet-body { padding: 15px 16px 20px; }
+    .sheet-head { padding: 14px 16px 11px; }
+    .sheet-foot { padding: 12px 16px 16px; }
+  }
+
+  /* —— ④ 错题本 —— */
+  .wb-item {
+    border: 1px solid #e8ebf4; border-left: 4px solid #ff7875; border-radius: 10px;
+    padding: 12px 14px; margin-bottom: 10px; background: #fffcfc;
+  }
+  .wb-item .wb-q { font-size: 15px; font-weight: 600; color: #2b3150; line-height: 1.5; }
+  .wb-item .wb-line { font-size: 13.5px; line-height: 1.6; margin-top: 5px; }
+  .wb-item .wb-line.user { color: #cf1322; }
+  .wb-item .wb-line.best { color: #237804; font-weight: 600; }
+  .wb-item .wb-meta {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+    margin-top: 8px; font-size: 11.5px; color: #9aa0b0;
+  }
+  .wb-item .wb-meta .wb-mode {
+    background: #eef1fd; color: #5a6bc4; border-radius: 999px; padding: 2px 8px; font-weight: 600;
+  }
+  .wb-item .wb-meta .wb-del {
+    margin-left: auto; border: none; background: none; color: #b6bac7;
+    cursor: pointer; font-size: 11.5px; text-decoration: underline; padding: 2px;
+  }
+  .wb-item .wb-meta .wb-del:hover { color: #cf1322; }
+  .wb-count-note { font-size: 12.5px; color: #9aa0b0; margin: 0 0 14px; line-height: 1.6; }
+  .empty-hint {
+    text-align: center; color: #b6bac7; font-size: 13.5px;
+    padding: 44px 16px; line-height: 1.9;
+  }
+  .empty-hint .eh-ico { font-size: 34px; display: block; margin-bottom: 10px; }
+
+  /* —— ⑤ 每日 10 分钟路径 —— */
+  .day-list { display: flex; flex-direction: column; gap: 9px; }
+  .day-card {
+    display: flex; align-items: center; gap: 13px; width: 100%;
+    border: 1px solid #e8ebf4; border-radius: 12px; padding: 13px 15px;
+    background: #fff; cursor: pointer; text-align: left; font-family: inherit;
+    transition: border-color .16s, background .16s, transform .08s;
+  }
+  .day-card:hover { border-color: #c9d1f0; background: #fafbff; }
+  .day-card:active { transform: scale(.99); }
+  .day-card.today { border-color: #667eea; background: #f7f9ff; box-shadow: 0 2px 12px rgba(102,126,234,.13); }
+  .day-card.done { background: #f7fffd; border-color: #b5e8e8; }
+  .day-card .dc-no {
+    flex: 0 0 auto; width: 40px; height: 40px; border-radius: 11px;
+    background: #eef1fd; color: #5a6bc4; font-weight: 700; font-size: 12px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    line-height: 1.15;
+  }
+  .day-card.today .dc-no { background: #667eea; color: #fff; }
+  .day-card.done .dc-no { background: #13c2c2; color: #fff; }
+  .day-card .dc-no b { font-size: 15px; }
+  .day-card .dc-info { flex: 1; min-width: 0; }
+  .day-card .dc-title { font-size: 14.5px; font-weight: 700; color: #2b3150; }
+  .day-card .dc-sub { font-size: 12.5px; color: #9aa0b0; margin-top: 3px; }
+  .day-card .dc-state { flex: 0 0 auto; font-size: 12.5px; font-weight: 700; color: #667eea; }
+  .day-card.done .dc-state { color: #08979c; }
+
+  /* —— ⑥ 场景标签选择条 —— */
+  .tag-picker { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tag-chip {
+    border: 2px solid #e8e8e8; background: #fff; color: #666;
+    border-radius: 999px; padding: 8px 15px; font-size: 13.5px; cursor: pointer;
+    font-family: inherit; transition: all .18s;
+  }
+  .tag-chip:hover { border-color: #667eea; color: #667eea; background: #f8f9ff; }
+  .tag-chip.active { background: #667eea; border-color: #667eea; color: #fff; font-weight: 700; }
+  .tag-chip .tc-n { font-size: 11.5px; opacity: .75; margin-left: 3px; }
+
+  /* —— ⑦ 结果分享卡片 —— */
+  .share-stage {
+    background: #f4f5fb; border-radius: 12px; padding: 14px;
+    display: flex; justify-content: center; overflow: hidden;
+  }
+  #shareCanvas {
+    width: 100%; max-width: 420px; height: auto; border-radius: 10px;
+    box-shadow: 0 10px 30px rgba(30,35,80,.16); display: block;
+  }
+  .share-tip { font-size: 12.5px; color: #9aa0b0; margin-top: 12px; line-height: 1.7; text-align: center; }
+  .share-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .share-actions button {
+    flex: 1 1 auto; min-width: 130px; border-radius: 10px; padding: 11px 16px;
+    font-size: 14px; cursor: pointer; font-family: inherit; border: none;
+  }
+  #shareDownload { background: #667eea; color: #fff; font-weight: 700; }
+  #shareCopy { background: #f0f1f7; color: #5a6178; font-weight: 600; }
+
+  /* —— 本轮练完的完成面板 —— */
+  .done-stats { display: flex; gap: 10px; margin: 4px 0 18px; }
+  .done-stat {
+    flex: 1; text-align: center; background: #f7f9ff; border: 1px solid #e4e9fb;
+    border-radius: 12px; padding: 15px 8px;
+  }
+  .done-stat .ds-num {
+    font-size: 25px; font-weight: 800; color: #4a5ca8; line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .done-stat .ds-lbl { font-size: 12px; color: #8a93bb; margin-top: 5px; }
+  .done-stat.r1 .ds-num { color: #389e0d; }
+  .done-stat.r2 .ds-num { color: #d46b08; }
+  .done-title { font-size: 20px; font-weight: 800; color: #2b3150; text-align: center; margin-bottom: 6px; }
+  .done-sub { font-size: 13.5px; color: #8a93bb; text-align: center; margin-bottom: 18px; line-height: 1.7; }
+
+  /* —— 顶部栏进度条在「查看模式」下的今日态 —— */
+  .tb-today-hint { font-size: 11.5px; color: #a8adb8; margin-left: 2px; white-space: nowrap; }
+  @media (max-width: 640px) { .tb-today-hint { display: none; } }
 </style>
 </head>
 <body>
+  <!-- ============ 顶部固定进度条（Duolingo 风格：进度 + 🔥streak + 入口）============ -->
+  <div id="topBar">
+    <div class="tb-progress">
+      <div class="tb-track"><div class="tb-fill" id="tbFill"></div></div>
+      <span class="tb-count" id="tbCount">0 / 10</span>
+      <span class="tb-today-hint" id="tbHint">今日目标 0/10</span>
+    </div>
+    <div class="tb-streak" id="tbStreak" title="连续答对次数">
+      <span class="tb-flame">🔥</span><span id="tbStreakNum">0</span>
+    </div>
+    <button class="tb-btn" id="btnDay" type="button" title="每日 10 分钟路径">📅</button>
+    <button class="tb-btn" id="btnTags" type="button" title="按场景标签练习">🏷️</button>
+    <button class="tb-btn" id="btnWrong" type="button" title="错题本">
+      📕<span class="tb-badge" id="wrongBadge" hidden>0</span>
+    </button>
+    <button class="tb-btn" id="btnShare" type="button" title="生成分享卡片">📤</button>
+  </div>
+
+  <!-- ============ 通用弹层 ============ -->
+
+  <!-- 错题本 -->
+  <div class="overlay" id="wrongBook">
+    <div class="sheet">
+      <header class="sheet-head">
+        <div>
+          <div class="cfg-title">📕 错题本</div>
+          <div class="cfg-sub">答错的题会自动收进来，优先再次出现</div>
+        </div>
+        <button type="button" class="sheet-close" data-close="wrongBook">✕</button>
+      </header>
+      <div class="sheet-body" id="wrongBody"></div>
+      <div class="sheet-foot">
+        <button id="wrongPractice" class="btn-primary">🎯 只练错题</button>
+        <button id="wrongClear" class="btn-outline">清空错题本</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 每日 10 分钟路径 -->
+  <div class="overlay" id="dayPath">
+    <div class="sheet">
+      <header class="sheet-head">
+        <div>
+          <div class="cfg-title">📅 每日 10 分钟路径</div>
+          <div class="cfg-sub">每天固定 10 题，不用想练什么</div>
+        </div>
+        <button type="button" class="sheet-close" data-close="dayPath">✕</button>
+      </header>
+      <div class="sheet-body" id="dayBody"></div>
+    </div>
+  </div>
+
+  <!-- 场景标签 -->
+  <div class="overlay" id="tagPicker">
+    <div class="sheet" style="height:auto;max-height:min(560px,calc(100vh - 48px));">
+      <header class="sheet-head">
+        <div>
+          <div class="cfg-title">🏷️ 按场景练</div>
+          <div class="cfg-sub">挑一个你最近用得上的场景</div>
+        </div>
+        <button type="button" class="sheet-close" data-close="tagPicker">✕</button>
+      </header>
+      <div class="sheet-body" id="tagBody"></div>
+    </div>
+  </div>
+
+  <!-- 分享卡片 -->
+  <div class="overlay" id="shareBox">
+    <div class="sheet" style="height:auto;max-height:calc(100vh - 48px);">
+      <header class="sheet-head">
+        <div>
+          <div class="cfg-title">📤 今日成绩</div>
+          <div class="cfg-sub">下载或复制图片，发到社交平台</div>
+        </div>
+        <button type="button" class="sheet-close" data-close="shareBox">✕</button>
+      </header>
+      <div class="sheet-body" id="shareBody">
+        <div class="share-stage"><canvas id="shareCanvas" width="840" height="1050"></canvas></div>
+        <p class="share-tip">点「下载图片」保存到本地；点「复制图片」可直接粘贴到聊天窗口。</p>
+        <div class="share-actions">
+          <button id="shareDownload">⬇ 下载图片</button>
+          <button id="shareCopy">📋 复制图片</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 本轮练完的完成面板 -->
+  <div class="overlay" id="doneSheet">
+    <div class="sheet" style="height:auto;max-height:calc(100vh - 48px);">
+      <div class="sheet-body" style="padding:26px 24px;">
+        <div class="done-title" id="doneTitle">🎉 今日完成</div>
+        <div class="done-sub" id="doneSub"></div>
+        <div class="done-stats" id="doneStats"></div>
+        <div class="share-actions">
+          <button id="doneShare" class="btn-primary" style="flex:1;">📤 生成分享卡片</button>
+          <button id="doneClose" class="btn-outline" style="flex:1;">继续练习</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <h1>英语表达练习器<span id="modeTag" class="tag demo">演示模式</span></h1>
     <p class="sub">输入一句中文：给出 基础表达 / 更自然的说法 / 地道表达 + 常见错误 + 使用场景；输入单词：查词造句</p>
 
     <!-- 练习模式切换 -->
     <div class="mode-selector">
+      <button class="mode-btn" data-mode="daily">每日路径</button>
       <button class="mode-btn active" data-mode="view">查看模式</button>
       <button class="mode-btn" data-mode="scene">场景表达</button>
+      <button class="mode-btn" data-mode="tree">表达树</button>
       <button class="mode-btn" data-mode="choice">选择题</button>
       <button class="mode-btn" data-mode="blank">填空题</button>
     </div>
@@ -648,10 +1126,46 @@
       </div>
     </div>
 
+    <!-- 每日路径模式 -->
+    <div id="dailyMode" class="quiz-container">
+      <div class="quiz-question">
+        <div class="zh-text" id="dailyQuestion">准备开始今天的练习…</div>
+        <div class="q-tags" id="dailyTags"></div>
+        <div class="hint" id="dailyHint">今日目标 10 题</div>
+      </div>
+      <div class="quiz-options" id="dailyOptions"></div>
+      <div class="quiz-feedback" id="dailyFeedback"></div>
+      <div class="quiz-controls">
+        <button id="dailyNext">下一题</button>
+        <button id="dailyOpenPath" style="background:#f5f5f5;color:#666;">路径列表</button>
+      </div>
+    </div>
+
+    <!-- 表达树模式（分步骤构造句子） -->
+    <div id="treeMode" class="quiz-container">
+      <textarea id="treeInput" placeholder="请输入一个核心表达，例如：I want an orange"></textarea>
+      <div class="row"><button id="treeGo">生成表达树</button></div>
+      <div id="treeLoading" class="loading">思考中… 正在把句子拆成可替换的步骤</div>
+      <div id="treePanel" hidden>
+        <div class="tree-preview">
+          <div class="tp-label">正在构建的句子</div>
+          <div class="tp-sentence" id="treePreview"></div>
+          <div class="tp-zh" id="treeZh"></div>
+        </div>
+        <div class="tree-wrap" id="treeSteps"></div>
+        <div class="tree-actions">
+          <button id="treeSpeak" disabled>🔊 朗读这句</button>
+          <button id="treeAgain" disabled>🔄 再来一个表达</button>
+        </div>
+      </div>
+      <div id="treeError"></div>
+    </div>
+
     <!-- 选择题模式 -->
     <div id="choiceMode" class="quiz-container">
       <div class="quiz-question">
         <div class="zh-text" id="choiceQuestion">请选择正确的英文表达</div>
+        <div class="q-tags" id="choiceTags"></div>
         <div class="hint">哪一句听起来最自然？</div>
       </div>
       <div class="quiz-options" id="choiceOptions"></div>
@@ -666,6 +1180,7 @@
     <div id="blankMode" class="quiz-container">
       <div class="quiz-question">
         <div class="zh-text" id="blankQuestion">选择正确的词填入空位</div>
+        <div class="q-tags" id="blankTags"></div>
         <div class="q-line">
           <div class="hint" id="blankSentence" style="font-size:18px;color:#667eea;font-weight:bold;">I ___ an orange.</div>
           <button class="speak" id="blankSpeak" type="button" title="朗读"></button>
@@ -793,41 +1308,69 @@ const WORD_PROMPT = `你是一位英语表达教练，帮助中国人学单词�
 
 例句正文里不要出现任何标注符号，只输出 JSON。`;
 
-// 选择题模式（反向训练）：3 个选项，分别为 best / acceptable / wrong
-const CHOICE_PROMPT = `你是一位英语出题助手。用户输入一句中文，请生成一道语感选择题：
-3 个英文选项，其中 level 恰好 best / acceptable / wrong 各一个（选项顺序可打乱）。
-
-严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
-{"question":"这里的风景真美","options":[
-  {"text":"The scenery here is very beautiful.","level":"wrong"},
-  {"text":"The view here is so nice.","level":"acceptable"},
-  {"text":"The views here are breathtaking!","level":"best"}]}
-
-字段规则：
-- question: 用户输入的中文原句
-- options: 3 句英文表达：best=最自然地道；acceptable=语法正确但不够自然；wrong=典型中式英语或有语法/用词错误
-- 三档各恰好一个
-
-只输出 JSON，不要解释。`;
+// 选择题 / 每日路径 / 标签练习统一出一道「带场景标签的语感选择题」：
+// 原来的 CHOICE_PROMPT 已合并进 DAILY_PROMPT，避免两份几乎相同的提示词各改一处
 
 // 填空题模式：挖空一个关键词，给 3-4 个带语感等级的选项（best 恰好一个）
 const BLANK_PROMPT = `你是一位英语表达教练。用户输入一句中文，请生成一道填空题：
-挖空句子中的一个关键词（用 ___ 表示），给出 3~4 个选项，并标注每个选项的语感等级。
+挖空句子中的一个关键词（用 ___ 表示），给出 3~4 个选项，并标注每个选项的语感等级和中文释义。
 
 严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
 {"question":"我想吃一个橘子","sentence":"I'd like to ___ an orange.","zh":"(提示：表达想要的意思)","options":[
-  {"word":"have","level":"best"},
-  {"word":"eat","level":"acceptable"},
-  {"word":"take","level":"wrong"}]}
+  {"word":"have","level":"best","meaning":"吃；享用"},
+  {"word":"eat","level":"acceptable","meaning":"吃"},
+  {"word":"take","level":"wrong","meaning":"拿取"}]}
 
 字段规则：
 - question: 中文原句
 - sentence: 挖空后的英文句子（用 ___ 表示空位，只挖 1 个关键词）
 - zh: 可选的中文提示
-- options: 3~4 个候选词，每个标注 level：
-  - best：最自然、最常用（恰好 1 个）
-  - acceptable：语法正确，但语境不够自然
-  - wrong：搭配不当或不符合语法
+- options: 3~4 个候选词，每个标注 level 和 meaning：
+  - word: 候选词
+  - level: 语感等级（best：最自然、最常用，恰好 1 个；acceptable：语法正确但不够自然；wrong：搭配不当或不符合语法）
+  - meaning: 该词在此语境下的中文释义（简短，1-3 个字或词组）
+
+只输出 JSON，不要解释。`;
+
+// 每日路径 / 标签练习出题：给一句中文 → 同样结构的语感选择题（带标签）
+const DAILY_PROMPT = `你是一位英语出题助手。用户给你一句中文，请生成一道语感选择题：
+3 个英文选项，其中 level 恰好 best / acceptable / wrong 各一个（选项顺序可打乱）。
+同时标注每个选项中的关键词及其中文释义，并给题目打上场景标签。
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"question":"外面下雨了，记得带伞","tags":["Daily","Weather"],"options":[
+  {"text":"It's raining out, don't forget your umbrella.","level":"best","keyword":"don't forget","meaning":"别忘了"},
+  {"text":"It is raining outside, remember to bring an umbrella.","level":"acceptable","keyword":"bring","meaning":"带来"},
+  {"text":"Remember to take umbrella.","level":"wrong","keyword":"take umbrella","meaning":"带伞（缺冠词）"}]}
+
+字段规则：
+- question: 中文原句
+- tags: 场景标签数组，从 Food / Daily / Work / Travel / Social / Shopping / Weather 中选 1~2 个最贴切的（英文单词，首字母大写）
+- options: 3 句英文表达，每个包含 text（完整句子）、level（best=最自然地道；acceptable=语法正确但不够自然；wrong=典型中式英语或有语法/用词错误）、keyword（最关键的词或短语）、meaning（该关键词的中文释义）
+- 三档各恰好一个
+
+只输出 JSON，不要解释。`;
+
+// 表达树模式：把一句话拆成「分步可选」的构造步骤
+const TREE_PROMPT = `你是英语表达教练，负责把一句英文拆成「可替换的构造步骤」，帮学习者一步步搭出完整句子。
+
+用户会给你一个核心表达（中文或英文）。请输出：
+- base：核心句，用 {0}、{1}… 标出每个可替换位置（按步骤顺序编号）
+- zh：核心句中文意思
+- steps：2~3 个步骤，每个步骤是一类可以替换的成分
+
+严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
+{"base":"I want a {0} orange {1}.","zh":"我想吃一个…的橘子…。","steps":[
+  {"name":"选一个形容词","options":[
+    {"text":"juicy","zh":"多汁的"},{"text":"fresh","zh":"新鲜的"},{"text":"sweet","zh":"甜的"}]},
+  {"name":"选一个场景","options":[
+    {"text":"for breakfast","zh":"当早餐"},{"text":"after dinner","zh":"饭后"},{"text":"right now","zh":"现在"}]}]}
+
+字段规则：
+- base：核心句。用 {0}/{1}… 标出可替换位置，编号必须从 0 开始且与 steps 顺序一一对应（第一个 step 对应 {0}，第二个对应 {1}）。不要出现多余的占位符。
+- steps：2~3 步，每步给定 name（这一步在选什么，中文，如「选一个形容词」）和 options（3~4 个候选）
+- 每个 option：text 是替换进句子的英文片段，zh 是简短中文释义
+- 选项必须能直接填进 base 的对应位置，替换后是自然、能直接开口说的英语
 
 只输出 JSON，不要解释。`;
 
@@ -850,8 +1393,9 @@ const SCENE_PROMPT = `你是英语表达优化助手。用户输入一句中文�
 // ================= 反馈系统 =================
 // 分工：等级（best/acceptable/wrong）由前端根据数据直接判定；AI 只负责写反馈文案
 
-// 反馈文案 Prompt：输入 {sentence, word, level} → 输出 {message}（不改等级）
-const FEEDBACK_PROMPT = `你是一个英语学习应用的反馈系统（类似多邻国）。根据给定的等级，为学习者生成一条反馈文案。
+// 反馈文案 Prompt：输入 {sentence, word, level, correct} → 输出 {message, reason, tag, better}
+// tag（错误原因分类）与 better（更自然的表达）都由 AI 一并给出，等级仍由前端判定
+const FEEDBACK_PROMPT = `你是一个英语学习应用的反馈系统（类似多邻国）。根据给定的等级，为学习者生成反馈内容。
 
 等级（由系统给定，不要改变）：
 - best：选的是最自然、最常用的表达
@@ -859,17 +1403,18 @@ const FEEDBACK_PROMPT = `你是一个英语学习应用的反馈系统（类似�
 - wrong：不符合语法或语义
 
 规则：
-- best → 简短鼓励（10 字以内）
-- acceptable → 提醒语气差异（15 字以内）
-- wrong → 简单说明问题（20 字以内）
-- 语气自然、口语化，轻松一点
-- message 用中文写（可以夹带被比较的英文单词本身，但不要出现整句英文）
+- message 用中文写，口语化、轻松一点
+  - best → 简短鼓励（10 字以内）
+  - acceptable / wrong → 指出问题（20 字以内），可夹带被比较的英文单词本身，但不要出现整句英文
+- tag 是错误原因分类，只能取这四个值之一：词汇 / 语法 / 语气 / 搭配
+  - best 时给空字符串 ""
+- better：仅当 level=best 时，给一个「更地道、可替换的整句英文表达」（如果原句已经足够地道，可给空字符串）。其它等级给空字符串。
 
 输入格式：
-{"sentence":"Let's ___ out tonight.","word":"dine","level":"acceptable"}
+{"sentence":"Let's ___ out tonight.","word":"dine","level":"acceptable","correct":"Let's eat out tonight."}
 
 严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
-{"message":"不算错，但 'dine' 听起来更正式一点。"}
+{"message":"不算错，但 'eat' 听起来比 'dine' 更日常。","tag":"语气","better":""}
 
 只输出 JSON。`;
 
@@ -999,14 +1544,15 @@ async function callDeepSeek(text, isWord) {
   return { list, word: obj.word || null, definition: obj.definition || null, replace };
 }
 
-// 选择题 API 调用（3 个选项，best/acceptable/wrong 各一）
+// 选择题 API 调用（3 个选项，best/acceptable/wrong 各一，并带上场景标签）
+// 选择题 / 每日路径 / 标签练习共用这一个函数，避免同一结构写三份
 async function generateChoiceQuiz(text) {
-  const obj = await callDeepSeekAPI(CHOICE_PROMPT, text);
+  const obj = await callDeepSeekAPI(DAILY_PROMPT, text);
   const options = normalizeOptions(obj.options);
   if (!obj.question || options.length < 2) {
     throw new Error("选择题格式错误");
   }
-  return { question: obj.question, options: options };
+  return { question: obj.question, options: options, tags: normalizeTags(obj.tags) };
 }
 
 // 填空题 API 调用（3~4 个带等级的选项）
@@ -1030,6 +1576,72 @@ async function generateScenes(text) {
   return out;
 }
 
+// ================= 场景标签 =================
+// 标签固定枚举，便于统计与筛选；出题时由 AI 从前 7 个里挑 1~2 个
+const TAG_ORDER = ["Daily", "Food", "Work", "Travel", "Social", "Shopping", "Weather", "Other"];
+const TAG_CN = {
+  Daily: "日常", Food: "点餐/食物", Work: "工作", Travel: "旅行",
+  Social: "社交", Shopping: "购物", Weather: "天气", Other: "其他"
+};
+const TAG_ICON = {
+  Daily: "💬", Food: "🍽️", Work: "💼", Travel: "✈️",
+  Social: "👋", Shopping: "🛍️", Weather: "🌦️", Other: "🏷️"
+};
+// 把任意来源的标签规范化成固定枚举（未知的归 Other）
+function normalizeTags(raw) {
+  const list = (Array.isArray(raw) ? raw : [raw]).map(t => String(t == null ? "" : t).trim());
+  const out = [];
+  list.forEach(t => {
+    if (!t) return;
+    const key = TAG_ORDER.find(x => x.toLowerCase() === t.toLowerCase());
+    if (key && key !== "Other" && out.indexOf(key) < 0) out.push(key);
+  });
+  return out.length ? out.slice(0, 2) : ["Other"];
+}
+// 标签中文名（带图标）
+function tagLabel(key) {
+  return (TAG_ICON[key] || "🏷️") + " " + (TAG_CN[key] || key);
+}
+
+// ================= 每日路径 / 标签练习 =================
+// 出题直接复用 generateChoiceQuiz（同一个 DAILY_PROMPT、同样带 tags），
+// 不再单独放一份几乎相同的函数，改提示词时只有一处要动
+
+// ================= 表达树：把一句话拆成可替换的构造步骤 =================
+// 返回 {base, zh, steps:[{name, options:[{text, zh}]}]}
+async function generateTree(text) {
+  const obj = await callDeepSeekAPI(TREE_PROMPT, "核心表达：" + text);
+  const base = String(obj.base || "").trim();
+  if (!base) throw new Error("表达树格式错误");
+
+  const rawSteps = Array.isArray(obj.steps) ? obj.steps : [];
+  const steps = [];
+  rawSteps.forEach((s, i) => {
+    if (!s) return;
+    const opts = [];
+    (Array.isArray(s.options) ? s.options : []).forEach(o => {
+      if (!o) return;
+      const t = String(o.text || "").trim();
+      if (!t) return;
+      opts.push({ text: t, zh: String(o.zh || "").trim() });
+    });
+    if (!opts.length) return;
+    // 只保留 base 里真实存在的占位符，避免出现「点了没反应」的空步骤
+    if (base.indexOf("{" + i + "}") < 0) return;
+    steps.push({ name: String(s.name || ("第 " + (i + 1) + " 步")).trim(), options: opts.slice(0, 4) });
+  });
+  if (!steps.length) throw new Error("表达树没有可替换的步骤，换一句再试试");
+
+  // 占位符重编号：按出现顺序对应 {0}/{1}…，多余的直接去掉，
+  // 保证 base 里的占位符数量与 steps 一致（避免出现点不到的步骤）
+  let seq = 0;
+  const newBase = base.split(/(\{\d+\})/)
+    .map(p => (/^\{\d+\}$/.test(p) ? (seq < steps.length ? "{" + (seq++) + "}" : "") : p))
+    .join("");
+
+  return { base: newBase, zh: String(obj.zh || "").trim(), steps: steps };
+}
+
 // ================= 语感等级系统（前端判定，AI 不参与）=================
 // 统一数据结构：options = [{text, level}]；level 只允许 best / acceptable / wrong
 const LEVELS = ["best", "acceptable", "wrong"];
@@ -1045,7 +1657,8 @@ function normalizeOptions(raw) {
     const text = String(o.word || o.text || "").trim();
     if (!text) return;
     const level = LEVELS.indexOf(o.level) >= 0 ? o.level : "acceptable";
-    opts.push({ text: text, level: level });
+    const meaning = o.meaning || "";
+    opts.push({ text: text, level: level, word: text, meaning: meaning });
   });
   if (opts.length && !opts.some(o => o.level === "best")) opts[0].level = "best";
   return opts;
@@ -1108,7 +1721,8 @@ function pickLocalExplain(level, userText, bestText) {
 }
 
 // 渲染反馈条：level 决定图标，msg=点评文案，answer=展示的最佳表达（可省略）
-function renderFeedback(box, level, msg, answer) {
+// cmp={user, correct} 时追加「你的答案 → 正确说法」对比块（答错才有学习价值）
+function renderFeedback(box, level, msg, answer, cmp) {
   box.textContent = "";
   const p = document.createElement("div");
   p.className = "fb-msg";
@@ -1127,6 +1741,25 @@ function renderFeedback(box, level, msg, answer) {
     a.textContent = answer;
     box.appendChild(a);
   }
+  // 答错的对比句：左边你的答案（划掉），右边正确说法 —— 一眼看出差别
+  if (cmp && cmp.user && cmp.correct && cmp.user !== cmp.correct) {
+    const w = document.createElement("div");
+    w.className = "fb-cmp";
+    [["user", "你的答案", cmp.user], ["correct", "正确说法", cmp.correct]].forEach(row => {
+      const r = document.createElement("div");
+      r.className = "cmp-row " + row[0];
+      const k = document.createElement("span");
+      k.className = "cmp-k";
+      k.textContent = row[1];
+      const v = document.createElement("span");
+      v.className = "cmp-v";
+      v.textContent = row[2];
+      r.appendChild(k);
+      r.appendChild(v);
+      w.appendChild(r);
+    });
+    box.appendChild(w);
+  }
 }
 
 // 渲染/更新解释行（反向训练）
@@ -1140,11 +1773,57 @@ function renderExplain(box, text) {
   el.textContent = text;
 }
 
-// AI 反馈文案调用：只生成文案（等级由前端从数据直接给定）
+// 错误原因标签（词汇/语法/语气/搭配）：AI 返回前先用前端猜测兜底，点完立刻有内容
+const REASON_LOCAL = { best: [], acceptable: ["语气", "搭配"], wrong: ["语法", "词汇", "搭配"] };
+function guessReason(level) {
+  const arr = REASON_LOCAL[level] || [];
+  return arr.length ? arr[Math.floor(Math.random() * arr.length)] : "";
+}
+// 渲染 / 更新错误原因标签（text 为空则移除）
+function renderReason(box, text) {
+  let el = box.querySelector(".fb-reason");
+  if (!text) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "fb-reason";
+    box.appendChild(el);
+  }
+  el.textContent = "";
+  const k = document.createElement("span");
+  k.className = "rsn";
+  k.textContent = "错误原因 · ";
+  el.appendChild(k);
+  el.appendChild(document.createTextNode(text));
+}
+// 渲染 / 更新「更自然的说法」（答对时的可选升级表达）
+function renderBetter(box, text) {
+  let el = box.querySelector(".fb-better");
+  if (!text) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "fb-better";
+    box.appendChild(el);
+  }
+  el.textContent = "";
+  const k = document.createElement("span");
+  k.className = "bb-k";
+  k.textContent = "更自然的说法：";
+  const v = document.createElement("span");
+  v.className = "bb-v";
+  v.textContent = text;
+  el.appendChild(k);
+  el.appendChild(v);
+}
+
+// AI 反馈文案调用：生成点评 + 错误原因 + 更自然的表达（等级仍由前端判定）
 async function generateFeedbackText(info) {
-  const obj = await callDeepSeekAPI(FEEDBACK_PROMPT, JSON.stringify(info), { maxTokens: 80 });
+  const obj = await callDeepSeekAPI(FEEDBACK_PROMPT, JSON.stringify(info), { maxTokens: 140 });
   if (typeof obj.message !== "string" || !obj.message.trim()) throw new Error("反馈文案格式错误");
-  return obj.message.trim();
+  return {
+    message: obj.message.trim(),
+    tag: typeof obj.tag === "string" ? obj.tag.trim() : "",
+    better: typeof obj.better === "string" ? obj.better.trim() : ""
+  };
 }
 
 // AI 解释调用：两个表达的差异（反向训练）
@@ -1161,10 +1840,14 @@ let feedbackSeq = 0;
 async function upgradeFeedback(box, seq, info) {
   if (!CFG.key) return;
   try {
-    const msg = await generateFeedbackText(info);
+    const r = await generateFeedbackText(info);
     if (seq !== feedbackSeq) return;  // 已换题/重新作答，丢弃过期文案
     const t = box.querySelector(".fb-text");
-    if (t) t.textContent = msg;
+    if (t) t.textContent = r.message;
+    // 错误原因：只在答错/勉强时补，且不覆盖已有内容
+    if (r.tag && info.level !== "best") renderReason(box, r.tag);
+    // 更自然的表达：答对时补充
+    if (r.better && info.level === "best") renderBetter(box, r.better);
   } catch (e) {
     // 失败不打扰答题，保留本地兜底文案
   }
@@ -1200,6 +1883,281 @@ function trackEvent(action, data) {
   } catch (e) {
     // 埋点失败不影响使用
   }
+}
+
+// ================= 成长系统：进度 / streak / 错题本 / 每日路径 / 标签 / 分享 =================
+// 全部状态只落在本机 localStorage，不上传任何数据
+// 注意：常量不写在中段——顶部进度条的初始化函数 updateTopBar() 会被更早的代码调用，
+// 那些 const/let 要等 init() 里才真正求值，避免暂时性死区（TDZ）报错
+
+const LS = {
+  progress: "eng_progress",     // 本轮进度 {currentQuestionIndex,totalQuestions,streak,maxStreak}
+  stats: "eng_stats",           // 今日与累计统计
+  wrong: "eng_wrong",           // 错题本 Question[]
+  daily: "eng_daily",           // 每日路径打卡 {dayIndex, doneDates[]}
+  session: "eng_session",       // 上一轮练习的小结（用于完成面板/分享卡）
+  lastPractice: "eng_last_practice"  // 上次练习日期，用于跨天判定
+};
+
+function lsGet(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch (e) { return fallback; }
+}
+function lsSet(key, val) {
+  try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {}
+}
+// 本地日期（YYYY-MM-DD），所有「每日」判定都用它，避免 UTC 跨天错位
+function todayKey(d) {
+  const t = d || new Date();
+  const p = n => String(n).padStart(2, "0");
+  return t.getFullYear() + "-" + p(t.getMonth() + 1) + "-" + p(t.getDate());
+}
+
+// —— 题数常量（必须声明在最前：下面的 progress 初始化与 updateTopBar 都会读）——
+const DAILY_SIZE = 10;      // 每日路径：每天固定 10 题
+let DEFAULT_TOTAL = 10;     // 自由练习：一轮 10 题
+
+// —— ① 进度 + streak ——
+let progress = lsGet(LS.progress, null) || {
+  currentQuestionIndex: 0, totalQuestions: DEFAULT_TOTAL, streak: 0, maxStreak: 0
+};
+// 兼容旧数据 / 脏数据
+if (typeof progress.totalQuestions !== "number" || progress.totalQuestions <= 0) progress.totalQuestions = DEFAULT_TOTAL;
+if (typeof progress.currentQuestionIndex !== "number" || progress.currentQuestionIndex < 0) progress.currentQuestionIndex = 0;
+if (typeof progress.streak !== "number") progress.streak = 0;
+if (typeof progress.maxStreak !== "number") progress.maxStreak = 0;
+
+// —— 统计（今日 + 累计）——
+let stats = lsGet(LS.stats, null) || { date: todayKey(), todayDone: 0, totalDone: 0, correct: 0, total: 0 };
+
+// —— 错题本 ——
+let wrongBook = lsGet(LS.wrong, []) || [];
+
+// —— 每日路径 ——
+const dayPlan = lsGet(LS.daily, null) || {
+  dayIndex: 0,          // 已完成到第几个 Day（从 0 开始）
+  lastDate: "",         // 上次练习的日期，跨天时 +1
+  doneDates: []         // 已完成的日期，避免重复计数
+};
+
+// 今日数据重置：跨天时把今日计数清零（练习时调用）
+function rollDayIfNeeded() {
+  const t = todayKey();
+  if (stats.date !== t) {
+    stats.date = t;
+    stats.todayDone = 0;
+    lsSet(LS.stats, stats);
+  }
+}
+
+// 顶部进度条元素的引用：统一在 init() 里赋值（见文件末尾），避免暂时性死区
+let topBarEl, tbFill, tbCount, tbHint, tbStreakEl, tbStreakNum, wrongBadge;
+
+// 刷新顶部进度条（进度 / streak / 今日目标 / 错题角标）
+function updateTopBar() {
+  if (!tbFill) return;   // 元素尚未初始化时静默跳过
+  const total = progress.totalQuestions || DEFAULT_TOTAL;
+  const idx = Math.min(progress.currentQuestionIndex, total);
+  const pct = Math.round(idx / total * 100);
+  tbFill.style.width = pct + "%";
+  tbFill.classList.toggle("full", idx >= total);
+  tbCount.textContent = idx + " / " + total;
+  tbStreakNum.textContent = progress.streak;
+  tbHint.textContent = "今日 " + stats.todayDone + "/" + DAILY_SIZE + " 题";
+
+  const n = wrongBook.length;
+  wrongBadge.textContent = n > 99 ? "99+" : n;
+  wrongBadge.hidden = n === 0;
+  lsSet(LS.progress, progress);
+  lsSet(LS.stats, stats);
+}
+
+// 开始一轮练习：重置进度与 streak，并清掉上一轮的练习来源
+function startRound(total) {
+  progress.currentQuestionIndex = 0;
+  progress.totalQuestions = total || DEFAULT_TOTAL;
+  progress.streak = 0;
+  // maxStreak 是跨轮保留的最好成绩，不重置
+  activeWrong = false;
+  activeTagPool = null;
+  setTopBarVisible(true);
+  updateTopBar();
+}
+function setTopBarVisible(on) {
+  if (!topBarEl) return;
+  topBarEl.classList.toggle("show", !!on);
+  document.body.classList.toggle("hasTopBar", !!on);
+}
+
+// 记一次作答：更新进度 / streak / 统计，并给出反馈方向
+// 返回 {streak, broke, maxStreak}
+function recordAnswer(level) {
+  rollDayIfNeeded();
+  const correct = level === "best";
+  const prev = progress.streak;
+
+  if (correct) {
+    progress.streak = prev + 1;
+    if (progress.streak > progress.maxStreak) progress.maxStreak = progress.streak;
+  } else {
+    progress.streak = 0;   // 中断
+  }
+  progress.currentQuestionIndex = Math.min(
+    progress.currentQuestionIndex + 1, progress.totalQuestions);
+
+  stats.todayDone++;
+  stats.totalDone++;
+  stats.total++;
+  if (correct) stats.correct++;
+
+  updateTopBar();
+  if (correct) {
+    // 答对：🔥 弹一下（轻微动画）
+    tbStreakEl.classList.remove("broken");
+    tbStreakEl.classList.add("bump");
+    setTimeout(() => tbStreakEl.classList.remove("bump"), 520);
+  } else if (prev > 0) {
+    // 中断且之前有连续 → ❌ streak broken 抖动
+    tbStreakEl.classList.add("broken");
+    setTimeout(() => tbStreakEl.classList.remove("broken"), 700);
+  }
+
+  trackEvent("answer", {
+    level: level, streak: progress.streak, correct: correct,
+    index: progress.currentQuestionIndex
+  });
+  return { streak: progress.streak, broke: !correct && prev > 0, maxStreak: progress.maxStreak, prev: prev };
+}
+
+// 本轮是否已练完
+function isRoundDone() {
+  return progress.currentQuestionIndex >= progress.totalQuestions;
+}
+
+// —— ④ 错题本 ——
+// 错题按题面去重；同一道题再错则累加 wrongCount（权重更高，优先再次出现）
+function addWrong(q) {
+  if (!q || !q.question) return;
+  const key = q.question + "|" + (q.mode || "");
+  const hit = wrongBook.find(x => (x.question + "|" + (x.mode || "")) === key);
+  if (hit) {
+    hit.wrongCount = (hit.wrongCount || 1) + 1;
+    hit.ts = Date.now();
+  } else {
+    wrongBook.unshift({
+      question: q.question, options: q.options, sentence: q.sentence || "",
+      zh: q.zh || "", mode: q.mode || "choice", tags: q.tags || [],
+      userAnswer: q.userAnswer || "", bestAnswer: q.bestAnswer || "",
+      wrongCount: 1, ts: Date.now()
+    });
+    while (wrongBook.length > 60) wrongBook.pop();   // 上限 60 条，防止无限增长
+  }
+  lsSet(LS.wrong, wrongBook);
+  updateTopBar();
+}
+function removeWrong(index) {
+  wrongBook.splice(index, 1);
+  lsSet(LS.wrong, wrongBook);
+  renderWrongBook();
+  updateTopBar();
+}
+function clearWrong() {
+  wrongBook = [];
+  lsSet(LS.wrong, wrongBook);
+  renderWrongBook();
+  updateTopBar();
+}
+
+// 错题回放：错题本里存的就是完整题目，直接当题目用，不必重新请求 AI
+function wrongToQuestion(item) {
+  if (item.mode === "blank") {
+    return {
+      question: item.question, sentence: item.sentence, zh: item.zh || "",
+      options: normalizeOptions(item.options), tags: item.tags || [],
+      mode: "blank", fromWrong: true
+    };
+  }
+  return {
+    question: item.question, options: normalizeOptions(item.options),
+    tags: item.tags || [], mode: "choice", fromWrong: true
+  };
+}
+
+// 自由练习（选择题/填空题）选下一句时：错题优先再次出现（权重更高）
+function pickPracticeText() {
+  if (wrongBook.length && Math.random() < 0.45) {
+    // 按错误次数加权挑一道错题的原句
+    const pool = [];
+    wrongBook.forEach(w => {
+      const n = Math.min(w.wrongCount || 1, 3);
+      for (let i = 0; i < n; i++) pool.push(w.question);
+    });
+    const pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pick) return { text: pick, fromWrong: true };
+  }
+  return { text: POOL[Math.floor(Math.random() * POOL.length)], fromWrong: false };
+}
+
+// —— ⑤ 每日 10 分钟路径 ——
+// JSON 配置课程：每天一个主题 + 标签侧重 + 固定题目来源
+const DAY_PLAN = [
+  { day: 1, title: "基础表达", sub: "最常用、最容易开口的日常句", tags: ["Daily"], pool: ["我想吃一个橘子", "你今天看起来很累", "别担心，慢慢来", "我明天要早起", "我们好久没见了", "帮我一个忙好吗", "我对这个不太确定", "周末你想做什么", "我们什么时候出发", "这个主意不错，但实施起来很难"] },
+  { day: 2, title: "点餐", sub: "在餐厅、外卖、跟朋友吃饭时说", tags: ["Food"], pool: ["我想吃一个橘子", "这道菜太咸了", "帮我一个忙好吗", "周末你想做什么", "我们什么时候出发", "别担心，慢慢来", "外面下雨了，记得带伞", "这部电影太感人了", "这双鞋穿着很舒服", "你今天看起来很累"] },
+  { day: 3, title: "购物", sub: "试穿、砍价、评价商品", tags: ["Shopping"], pool: ["这双鞋穿着很舒服", "这个主意不错，但实施起来很难", "帮我一个忙好吗", "我对这个不太确定", "我想吃一个橘子", "你今天看起来很累", "我们好久没见了", "别担心，慢慢来", "周末你想做什么", "这部电影太感人了"] },
+  { day: 4, title: "出行", sub: "问路、赶时间、提醒同伴", tags: ["Travel"], pool: ["我们什么时候出发", "外面下雨了，记得带伞", "我明天要早起", "别担心，慢慢来", "帮我一个忙好吗", "这里的风景真美", "他说话太快了，我跟不上", "我对这个不太确定", "你今天看起来很累", "周末你想做什么"] },
+  { day: 5, title: "闲聊与社交", sub: "寒暄、分享感受、聊近况", tags: ["Social"], pool: ["我们好久没见了", "这里的风景真美", "这部电影太感人了", "周末你想做什么", "你今天看起来很累", "帮我一个忙好吗", "我对这个不太确定", "这个主意不错，但实施起来很难", "这道菜太咸了", "我明天要早起"] },
+  { day: 6, title: "工作沟通", sub: "表达意见、确认信息、说明进度", tags: ["Work"], pool: ["这个主意不错，但实施起来很难", "我对这个不太确定", "我明天要早起", "帮我一个忙好吗", "他说话太快了，我跟不上", "我们什么时候出发", "你今天看起来很累", "别担心，慢慢来", "周末你想做什么", "我们好久没见了"] },
+  { day: 7, title: "综合复习", sub: "把这一周的表达混起来再练一遍", tags: [], pool: [] }
+];
+// Day7 的综合复习：用整池随机抽
+function dayPool(day) {
+  const d = DAY_PLAN[(day - 1) % DAY_PLAN.length];
+  if (d && d.tags && d.tags.length) {
+    const tagged = POOL.filter(s => (canned[s] || {}) && true);
+    return d.pool.slice();
+  }
+  return POOL.slice();
+}
+function todayPlan() {
+  return DAY_PLAN[dayPlan.dayIndex % DAY_PLAN.length];
+}
+// 跨天推进：今天练过则不改；否则若之前练过（lastDate 有值），进入下一个 Day
+function refreshDayIndex() {
+  const t = todayKey();
+  if (dayPlan.lastDate === t) return;                 // 今天已经练过，Day 不变
+  if (dayPlan.doneDates.indexOf(t) >= 0) return;      // 今天已完成过
+  if (dayPlan.lastDate) dayPlan.dayIndex++;           // 新的一天 → 进入下一个 Day
+  lsSet(LS.daily, dayPlan);
+}
+// 今天练完一整轮每日路径 → 打卡（只记第一次，之后重复练不再 +1 天）
+function markDayDone() {
+  const t = todayKey();
+  if (dayPlan.doneDates.indexOf(t) >= 0) return false;
+  dayPlan.doneDates.push(t);
+  while (dayPlan.doneDates.length > 60) dayPlan.doneDates.shift();
+  dayPlan.lastDate = t;
+  lsSet(LS.daily, dayPlan);
+  return true;
+}
+function isTodayDone() {
+  return dayPlan.doneDates.indexOf(todayKey()) >= 0;
+}
+
+// —— ⑦ 分享卡数据 ——
+// 今日练习题数 / 正确率 / streak / 最长连续
+function shareStats() {
+  const today = stats.todayDone;
+  const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : 0;
+  return {
+    today: today,
+    accuracy: acc,
+    streak: progress.streak,
+    maxStreak: progress.maxStreak,
+    total: stats.totalDone,
+    day: todayPlan().day
+  };
 }
 
 // ================= 演示兜底（未填 Key 时用）=================
@@ -1368,48 +2326,48 @@ const choiceDemo = [
   {
     question: "我想吃一个橘子",
     options: [
-      { text: "I'd like to have an orange.", level: "best" },
-      { text: "I want to eat an orange.", level: "acceptable" },
-      { text: "I want eating an orange.", level: "wrong" }
+      { text: "I'd like to have an orange.", level: "best", keyword: "have", meaning: "吃；享用" },
+      { text: "I want to eat an orange.", level: "acceptable", keyword: "want to", meaning: "想要" },
+      { text: "I want eating an orange.", level: "wrong", keyword: "want eating", meaning: "想吃（语法错）" }
     ]
   },
   {
     question: "你今天看起来很累",
     options: [
-      { text: "You look really tired today.", level: "best" },
-      { text: "You seem to be very tired today.", level: "acceptable" },
-      { text: "You look like very tired today.", level: "wrong" }
+      { text: "You look really tired today.", level: "best", keyword: "look", meaning: "看起来" },
+      { text: "You seem to be very tired today.", level: "acceptable", keyword: "seem to be", meaning: "似乎" },
+      { text: "You look like very tired today.", level: "wrong", keyword: "look like", meaning: "看起来像（搭配错）" }
     ]
   },
   {
     question: "我明天要早起",
     options: [
-      { text: "I've got an early start tomorrow.", level: "best" },
-      { text: "I need to get up early tomorrow.", level: "acceptable" },
-      { text: "Tomorrow I must early get up.", level: "wrong" }
+      { text: "I've got an early start tomorrow.", level: "best", keyword: "early start", meaning: "早起的开始" },
+      { text: "I need to get up early tomorrow.", level: "acceptable", keyword: "get up early", meaning: "早起" },
+      { text: "Tomorrow I must early get up.", level: "wrong", keyword: "early get up", meaning: "早起（语序错）" }
     ]
   },
   {
     question: "帮我一个忙好吗",
     options: [
-      { text: "Can you do me a favor?", level: "best" },
-      { text: "Could you help me with something?", level: "acceptable" },
-      { text: "Can you help me a small thing?", level: "wrong" }
+      { text: "Can you do me a favor?", level: "best", keyword: "do me a favor", meaning: "帮忙" },
+      { text: "Could you help me with something?", level: "acceptable", keyword: "help me", meaning: "帮助我" },
+      { text: "Can you help me a small thing?", level: "wrong", keyword: "help me a thing", meaning: "帮我一件事（搭配错）" }
     ]
   }
 ];
 
-// 填空题演示数据（未填 Key 时用）：选项带语感等级
+// 填空题演示数据（未填 Key 时用）：选项带语感等级和中文释义
 const blankDemo = [
   {
     question: "我想吃一个橘子",
     sentence: "I'd like to ___ an orange.",
     zh: "(提示：表达「想要」的意思)",
     options: [
-      { word: "have", level: "best" },
-      { word: "eat", level: "acceptable" },
-      { word: "get", level: "acceptable" },
-      { word: "take", level: "wrong" }
+      { word: "have", level: "best", meaning: "吃；享用" },
+      { word: "eat", level: "acceptable", meaning: "吃" },
+      { word: "get", level: "acceptable", meaning: "拿到" },
+      { word: "take", level: "wrong", meaning: "拿取" }
     ]
   },
   {
@@ -1417,9 +2375,9 @@ const blankDemo = [
     sentence: "These shoes are so ___.",
     zh: "(提示：形容穿着感受的形容词)",
     options: [
-      { word: "comfortable", level: "best" },
-      { word: "amazing", level: "acceptable" },
-      { word: "comfort", level: "wrong" }
+      { word: "comfortable", level: "best", meaning: "舒适的" },
+      { word: "amazing", level: "acceptable", meaning: "很棒的" },
+      { word: "comfort", level: "wrong", meaning: "舒适（名词）" }
     ]
   },
   {
@@ -1427,10 +2385,10 @@ const blankDemo = [
     sentence: "We haven't ___ in ages!",
     zh: "(提示：表达「叙旧、聊天」)",
     options: [
-      { word: "caught up", level: "best" },
-      { word: "met", level: "acceptable" },
-      { word: "talked", level: "acceptable" },
-      { word: "seen", level: "wrong" }
+      { word: "caught up", level: "best", meaning: "叙旧" },
+      { word: "met", level: "acceptable", meaning: "见面" },
+      { word: "talked", level: "acceptable", meaning: "聊天" },
+      { word: "seen", level: "wrong", meaning: "看见" }
     ]
   },
   {
@@ -1438,10 +2396,10 @@ const blankDemo = [
     sentence: "It's ___ out there.",
     zh: "(提示：表达「下大雨」)",
     options: [
-      { word: "pouring", level: "best" },
-      { word: "raining", level: "acceptable" },
-      { word: "rainy", level: "acceptable" },
-      { word: "rain", level: "wrong" }
+      { word: "pouring", level: "best", meaning: "倾盆大雨" },
+      { word: "raining", level: "acceptable", meaning: "下雨" },
+      { word: "rainy", level: "acceptable", meaning: "多雨的" },
+      { word: "rain", level: "wrong", meaning: "雨（名词）" }
     ]
   }
 ];
@@ -1706,6 +2664,8 @@ const viewMode = document.getElementById("viewMode");
 const sceneMode = document.getElementById("sceneMode");
 const choiceMode = document.getElementById("choiceMode");
 const blankMode = document.getElementById("blankMode");
+const treeMode = document.getElementById("treeMode");
+const dailyMode = document.getElementById("dailyMode");
 const modeButtons = document.querySelectorAll(".mode-btn");
 
 // 模式切换逻辑
@@ -1730,14 +2690,29 @@ function switchMode(mode) {
   sceneMode.classList.toggle("show", mode === "scene");
   choiceMode.classList.toggle("show", mode === "choice");
   blankMode.classList.toggle("show", mode === "blank");
+  treeMode.classList.toggle("show", mode === "tree");
+  dailyMode.classList.toggle("show", mode === "daily");
+
+  // 顶部进度条只在「需要做题」的模式里出现（查看/场景/表达树是自由探索，不占屏幕）
+  const needsTopBar = mode === "choice" || mode === "blank" || mode === "daily";
+  setTopBarVisible(needsTopBar);
+  // 只在「上一轮已经练完」时自动开新一轮；中途切换题型保留当前进度，
+  // 也让「只练错题 / 按标签练」设置的整轮来源不会被这里重置
+  if (needsTopBar && isRoundDone()) {
+    startRound(mode === "daily" ? DAILY_SIZE : DEFAULT_TOTAL);
+  }
 
   // 切换到练习模式时加载第一题
   if (mode === "choice") {
     loadChoiceQuestion();
   } else if (mode === "blank") {
     loadBlankQuestion();
+  } else if (mode === "daily") {
+    loadDailyQuestion();
   } else if (mode === "scene") {
     sceneInputEl.focus();
+  } else if (mode === "tree") {
+    treeInputEl.focus();
   }
 }
 
@@ -2054,12 +3029,11 @@ function appendCard(label, speakText, mainText, zhText, cls, chipOptions) {
   });
   div.appendChild(en);
 
-  if (zhText) {
-    const zh = document.createElement("div");
-    zh.className = "zh";
-    zh.textContent = zhText;
-    div.appendChild(zh);
-  }
+  const zhEl = document.createElement("div");
+  zhEl.className = "zh";
+  zhEl.textContent = zhText || "";
+  div.appendChild(zhEl);
+
   if (Array.isArray(chipOptions) && chipOptions.length) {
     const wrap = document.createElement("div");
     wrap.className = "chips";
@@ -2080,6 +3054,10 @@ function appendCard(label, speakText, mainText, zhText, cls, chipOptions) {
         blanks.forEach(b => { b.textContent = w; b.classList.add("filled"); });
         curSpeak = String(mainText).split("___").join(w);
         speak(curSpeak);
+
+        // 更新中文注释：显示填入后的完整句子的中文翻译
+        const filledSentence = String(mainText).split("___").join(w);
+        zhEl.textContent = zhText ? zhText + " → " + filledSentence : filledSentence;
 
         // 语感等级：前端直接从数据里查（best/acceptable/wrong），点击即出，不依赖网络
         const level = getLevel(w, chipOptions);
@@ -2106,7 +3084,12 @@ function appendCard(label, speakText, mainText, zhText, cls, chipOptions) {
 }
 
 // 常见错误卡：红色边框，一行 ❌ 错误句 + 一行 ✅ 正确句（可朗读）
+// 入参统一为数组：AI 返回的 mistake 已在 callDeepSeek 里规整成数组，
+// 但演示数据（canned）里存的是单个对象，这里再做一次兼容，避免
+// 「演示模式下常见错误卡不显示」的老问题
 function appendMistake(pairs) {
+  const list = (Array.isArray(pairs) ? pairs : [pairs]).filter(p => p && p.wrong && p.right);
+  if (!list.length) return;
   const div = document.createElement("div");
   div.className = "result lv-mistake";
   const head = document.createElement("div");
@@ -2120,10 +3103,10 @@ function appendMistake(pairs) {
   btn.type = "button";
   btn.title = "朗读正确说法";
   btn.innerHTML = SPEAK_ICON;
-  btn.addEventListener("click", () => speak(pairs[0].right));
+  btn.addEventListener("click", () => speak(list[0].right));
   head.appendChild(btn);
   div.appendChild(head);
-  pairs.forEach(p => {
+  list.forEach(p => {
     const wl = document.createElement("div");
     wl.className = "m-line bad";
     wl.textContent = "❌ " + p.wrong;
@@ -2237,7 +3220,9 @@ async function run() {
     appendCard(item.t, item.en, item.en, null, LV_CLS[i] || "");
   });
   // ② 常见错误卡（红）：❌ 中国人容易说错 / ✅ 正确说法
-  if (r.mistake && r.mistake.length) {
+  // 注意：AI 返回的是数组，演示数据（canned）里是单个对象，
+  // 所以这里只判空、不判 .length（对象没有 length），由 appendMistake 统一规整
+  if (r.mistake) {
     appendMistake(r.mistake);
   }
   // ③ 使用场景卡（灰）：中文说明一句话用在哪
@@ -2285,22 +3270,129 @@ function shuffle(arr) {
 renderExamples();
 document.getElementById("shuffleEx").addEventListener("click", renderExamples);
 
+// ================= 作答后的统一收尾：完成面板 / 今日完成 =================
+// 本轮的练习来源，整轮有效（只练错题 / 按标签练），由 startRound 清零
+let activeWrong = false;
+let activeTagPool = null;
+
+// 本轮是否已经练完 → 弹出完成面板（返回 true 表示已拦截，不要再出下一题）
+function guardRoundDone() {
+  if (!isRoundDone()) return false;
+  openDone();
+  return true;
+}
+
+// 弹层通用开关
+function openOverlay(id) { document.getElementById(id).classList.add("open"); }
+function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
+document.querySelectorAll("[data-close]").forEach(b => {
+  b.addEventListener("click", () => closeOverlay(b.dataset.close));
+});
+document.querySelectorAll(".overlay").forEach(ov => {
+  ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("open"); });
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  document.querySelectorAll(".overlay.open").forEach(ov => ov.classList.remove("open"));
+});
+
+// 本轮练完的完成面板：展示今日题数 / 正确率 / streak，并提供分享与继续
+function openDone() {
+  const s = shareStats();
+  const plan = todayPlan();
+  const isDaily = CFG.mode === "daily";
+  // 每日路径练完一整轮 → 打卡，明天 Day 自动 +1
+  const firstTimeToday = isDaily ? markDayDone() : false;
+  document.getElementById("doneTitle").textContent =
+    isDaily ? "🎉 今日完成" : "🎉 这一轮练完啦";
+  document.getElementById("doneSub").textContent = isDaily
+    ? "Day " + plan.day + " · " + plan.title + (firstTimeToday
+        ? " 已完成，明天继续下一课。"
+        : " 又练了一遍，明天继续下一课。")
+    : "做满 " + progress.totalQuestions + " 题了，休息一下，或者再来一轮。";
+  const stats_ = document.getElementById("doneStats");
+  stats_.innerHTML = "";
+  [["今日题数", s.today, ""], ["正确率", s.accuracy + "%", "r1"], ["🔥 连续", s.streak, "r2"]]
+    .forEach(([lbl, num, cls]) => {
+      const d = document.createElement("div");
+      d.className = "done-stat " + cls;
+      const n = document.createElement("div");
+      n.className = "ds-num";
+      n.textContent = num;
+      const l = document.createElement("div");
+      l.className = "ds-lbl";
+      l.textContent = lbl;
+      d.appendChild(n); d.appendChild(l);
+      stats_.appendChild(d);
+    });
+  openOverlay("doneSheet");
+  trackEvent("round_done", { today: s.today, accuracy: s.accuracy, streak: s.streak });
+}
+document.getElementById("doneClose").addEventListener("click", () => {
+  closeOverlay("doneSheet");
+  // 「继续练习」= 开新一轮（进度归零；streak 归零但 maxStreak 作为最好成绩保留）
+  const total = progress.totalQuestions;
+  startRound(total);
+  if (CFG.mode === "daily") loadDailyQuestion();
+  else if (CFG.mode === "choice") loadChoiceQuestion();
+  else if (CFG.mode === "blank") loadBlankQuestion();
+});
+document.getElementById("doneShare").addEventListener("click", () => {
+  closeOverlay("doneSheet");
+  openShare();
+});
+
 // ================= 选择题模式 =================
 let currentChoiceIndex = 0;
 let currentChoiceData = null;
 
+// 渲染题目上的场景标签
+function renderQuestionTags(box, tags) {
+  if (!box) return;
+  box.innerHTML = "";
+  (tags || []).forEach(t => {
+    const s = document.createElement("span");
+    s.className = "q-tag";
+    s.textContent = tagLabel(t);
+    box.appendChild(s);
+  });
+}
+
+// 统一的下一个题目：优先「只练错题」，其次「按标签练」，最后自由练习（错题优先再次出现）
+function nextQuestionSource() {
+  if (activeWrong) {
+    const rest = wrongBook.slice().sort((a, b) => (b.wrongCount || 1) - (a.wrongCount || 1));
+    if (rest.length) return rest[0];   // 错题本里的题目自带完整选项，直接回放
+  }
+  const pool = activeTagPool && activeTagPool.length ? activeTagPool : null;
+  const sentence = pool
+    ? pool[Math.floor(Math.random() * pool.length)]
+    : pickPracticeText().text;
+  return { question: sentence, tagPool: !!pool };
+}
+
+// 统一的题目来源：whole-round 的「只练错题 / 按标签练」优先，
+// 否则自由练习；customText 为用户自定义（需联网）
 async function loadChoiceQuestion(customText) {
   const choiceQuestion = document.getElementById("choiceQuestion");
   const choiceOptions = document.getElementById("choiceOptions");
   const choiceFeedback = document.getElementById("choiceFeedback");
+  const choiceTagBox = document.getElementById("choiceTags");
 
   choiceOptions.innerHTML = "";
   choiceFeedback.classList.remove("show");
+  choiceFeedback.textContent = "";
+  if (choiceTagBox) choiceTagBox.innerHTML = "";
 
   try {
     let data;
-    if (customText) {
-      // 自定义题目
+    const src = customText ? null : nextQuestionSource();
+    if (src && src.options) {
+      // 错题回放：题目就存在错题本里，不必再请求 AI
+      data = src;
+      data.fromWrong = true;
+      choiceQuestion.textContent = "生成中...";
+    } else if (customText) {
       if (!CFG.key) {
         alert("演示模式不支持自定义题目，请填入 DeepSeek API Key");
         return;
@@ -2308,28 +3400,42 @@ async function loadChoiceQuestion(customText) {
       choiceQuestion.textContent = "生成中...";
       data = await generateChoiceQuiz(customText);
     } else {
-      // 使用演示数据或随机句子
+      const sentence = src.question;
       if (CFG.key) {
-        const randomSentence = POOL[Math.floor(Math.random() * POOL.length)];
         choiceQuestion.textContent = "生成中...";
-        data = await generateChoiceQuiz(randomSentence);
+        data = await generateChoiceQuiz(sentence);
       } else {
-        data = choiceDemo[currentChoiceIndex % choiceDemo.length];
+        // 演示模式：优先找演示题库里的对应题，找不到就循环内置选择题
+        const demoHit = choiceDemo.find(d => d.question === sentence);
+        data = demoHit || choiceDemo[currentChoiceIndex % choiceDemo.length];
       }
     }
 
     currentChoiceData = data;
-    choiceQuestion.textContent = data.question;
+    // 中文题目添加悬停显示英文（取最佳答案）
+    const bestAnswer = bestOf(data.options);
+    choiceQuestion.innerHTML = "";
+    const span = document.createElement("span");
+    span.className = "hover-translation";
+    span.textContent = data.question;
+    span.setAttribute("data-translation", bestAnswer);
+    choiceQuestion.appendChild(span);
+    renderQuestionTags(choiceTagBox, data.tags);
 
     // 打乱选项顺序（3 句表达，best / acceptable / wrong 各一，等级藏在数据里）
-    const shuffled = shuffle(data.options.map(o => o.text));
+    const shuffled = shuffle(data.options);
 
     // 渲染选项
     shuffled.forEach(option => {
       const btn = document.createElement("button");
-      btn.className = "quiz-option";
-      btn.textContent = option;
-      btn.addEventListener("click", () => checkChoiceAnswer(option, btn));
+      btn.className = "quiz-option hover-translation";
+      btn.textContent = option.text;
+      // 选项悬停显示关键词的中文释义
+      const translation = option.keyword && option.meaning
+        ? `${option.keyword} - ${option.meaning}`
+        : data.question;
+      btn.setAttribute("data-translation", translation);
+      btn.addEventListener("click", () => checkChoiceAnswer(option.text, btn));
       choiceOptions.appendChild(btn);
     });
 
@@ -2343,7 +3449,8 @@ function checkChoiceAnswer(selected, btn) {
   const choiceOptions = document.getElementById("choiceOptions");
   const choiceFeedback = document.getElementById("choiceFeedback");
   const allOptions = choiceOptions.querySelectorAll(".quiz-option");
-  const options = currentChoiceData.options;
+  const data = currentChoiceData;
+  const options = data.options;
 
   // 禁用所有选项
   allOptions.forEach(opt => opt.classList.add("disabled"));
@@ -2351,7 +3458,6 @@ function checkChoiceAnswer(selected, btn) {
   // 语感等级：前端直接从数据里查，点击即出（AI 不参与判断）
   const level = getLevel(selected, options);
   const best = bestOf(options);
-  const seq = ++feedbackSeq;
 
   btn.classList.add(LEVEL_BTN_CLS[level]);
   if (level !== "best") {
@@ -2360,27 +3466,96 @@ function checkChoiceAnswer(selected, btn) {
       if (opt.textContent === best) opt.classList.add("correct");
     });
   }
-  choiceFeedback.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
-  renderFeedback(choiceFeedback, level, pickLocalFeedback(level, selected, best), level === "best" ? null : best);
+
+  // 答错的对比句由 cfm 统一渲染；答错时再补一条「差异解释」（本地先出，AI 回来替换）
+  cfm({
+    level: level, selected: selected, best: best, fbBox: choiceFeedback,
+    data: data, mode: "choice"
+  });
   if (level !== "best") {
-    // 反向训练：解释两句的差异（本地先出，AI 回来替换）
+    const seq = feedbackSeq;   // 复用 cfm 递增后的序号
     renderExplain(choiceFeedback, pickLocalExplain(level, selected, best));
     upgradeExplain(choiceFeedback, seq, { best: best, wrong: selected });
   }
-  speak(best);
-
-  // AI 只写反馈文案（等级/配色不变）
-  upgradeFeedback(choiceFeedback, seq, { sentence: best, word: selected, level: level });
-  trackEvent("select_word", { sentence: currentChoiceData.question, word: selected, level: level });
 }
 
-document.getElementById("choiceNext").addEventListener("click", () => loadChoiceQuestion());
+document.getElementById("choiceNext").addEventListener("click", () => {
+  if (guardRoundDone()) return;
+  loadChoiceQuestion();   // 本轮来源（只练错题 / 按标签）在 startRound 里设定，全程有效
+});
 document.getElementById("choiceCustom").addEventListener("click", () => {
   const text = prompt("请输入一句中文（例如：我想去看电影）");
   if (text && text.trim()) {
     loadChoiceQuestion(text.trim());
   }
 });
+
+// 错题答对后从错题本移除（保持错题本只留真正没掌握的）
+function removeWrongByQuestion(question, mode) {
+  const i = wrongBook.findIndex(x => x.question === question && (x.mode || "choice") === mode);
+  if (i >= 0) {
+    wrongBook.splice(i, 1);
+    lsSet(LS.wrong, wrongBook);
+    updateTopBar();
+  }
+}
+
+// 作答后的统一收尾：streak 变化提示 + 本轮完成提示
+// rec 来自 recordAnswer()，返回 {streak, broke, maxStreak, prev}
+function afterAnswer(level, rec, fbBox) {
+  if (rec.broke) {
+    // streak 中断要有明确反馈（多邻国式：❌ streak broken）
+    const note = document.createElement("div");
+    note.className = "fb-reason";
+    note.style.background = "rgba(255,77,79,.12)";
+    note.textContent = "❌ streak broken（中断，之前连续 " + rec.prev + " 题）";
+    (fbBox || document.getElementById("choiceFeedback")).appendChild(note);
+  }
+  // 每逢整轮完成，延迟一点弹完成面板（先让用户看完本题反馈）
+  if (isRoundDone()) setTimeout(() => { if (isRoundDone()) openDone(); }, 1400);
+}
+
+// 选择题 / 填空题 / 每日题共用的作答渲染，避免三处各写一遍（本次新增的对比句/reason/streak 只在这里维护）
+// cur: {level, selected, best, fbBox, data, mode, showAnswer, cmpUser, cmpCorrect}
+function cfm(cur) {
+  const level = cur.level, selected = cur.selected, best = cur.best;
+  const fb = cur.fbBox;
+  const seq = ++feedbackSeq;
+
+  fb.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
+  renderFeedback(
+    fb, level, pickLocalFeedback(level, selected, best),
+    level === "best" ? (cur.showAnswer || null) : best,
+    (level === "best" || !cur.data) ? null : { user: cur.cmpUser || selected, correct: cur.cmpCorrect || best }
+  );
+  if (level !== "best") renderReason(fb, guessReason(level));
+  speak(level === "best" && cur.showAnswer ? cur.showAnswer : best);
+
+  if (cur.data) {
+    // AI 只写反馈文案（等级/配色由前端判定）
+    upgradeFeedback(fb, seq, {
+      sentence: best, word: selected, level: level,
+      correct: cur.cmpCorrect || best
+    });
+    trackEvent("select_word", { sentence: cur.data.question, word: selected, level: level });
+  }
+
+  // 记进度 / streak；答错收进错题本
+  const rec = recordAnswer(level);
+  if (cur.data) {
+    if (level !== "best") {
+      addWrong({
+        question: cur.data.question, options: cur.data.options, mode: cur.mode,
+        sentence: cur.data.sentence || "", zh: cur.data.zh || "",
+        tags: cur.data.tags || [], userAnswer: selected, bestAnswer: best
+      });
+    } else if (cur.data.fromWrong) {
+      removeWrongByQuestion(cur.data.question, cur.mode);
+    }
+  }
+  afterAnswer(level, rec, fb);
+  return rec;
+}
 
 // ================= 填空题模式 =================
 let currentBlankIndex = 0;
@@ -2391,14 +3566,24 @@ async function loadBlankQuestion(customText) {
   const blankSentence = document.getElementById("blankSentence");
   const blankOptions = document.getElementById("blankOptions");
   const blankFeedback = document.getElementById("blankFeedback");
+  const blankTagBox = document.getElementById("blankTags");
 
   blankOptions.innerHTML = "";
   blankFeedback.classList.remove("show");
+  blankFeedback.textContent = "";
+  if (blankTagBox) blankTagBox.innerHTML = "";
   currentBlankData = null;  // 加载期间朗读按钮不读旧题
 
   try {
     let data;
-    if (customText) {
+    const src = customText ? null : nextQuestionSource();
+    if (src && src.options && src.mode === "blank") {
+      // 错题回放（填空题错题）：题目存在错题本里，不发请求
+      data = src;
+      data.fromWrong = true;
+      blankQuestion.textContent = "生成中...";
+      blankSentence.textContent = "";
+    } else if (customText) {
       // 自定义题目
       if (!CFG.key) {
         alert("演示模式不支持自定义题目，请填入 DeepSeek API Key");
@@ -2408,30 +3593,49 @@ async function loadBlankQuestion(customText) {
       blankSentence.textContent = "";  // 清掉占位示例句，避免误认成正在生成的题目
       data = await generateBlankQuiz(customText);
     } else {
-      // 使用演示数据或随机句子
+      // 用本轮的题目来源（按标签练 / 自由练习，自由练习时错题优先再次出现）
+      const sentence = (src && src.question) || pickPracticeText().text;
       if (CFG.key) {
-        const randomSentence = POOL[Math.floor(Math.random() * POOL.length)];
         blankQuestion.textContent = "生成中...";
         blankSentence.textContent = "";  // 清掉上一题的句子，等待新题时不留旧内容
-        data = await generateBlankQuiz(randomSentence);
+        data = await generateBlankQuiz(sentence);
       } else {
-        data = blankDemo[currentBlankIndex % blankDemo.length];
+        const demoHit = blankDemo.find(d => d.question === sentence);
+        data = demoHit || blankDemo[currentBlankIndex % blankDemo.length];
       }
     }
 
     currentBlankData = data;
-    blankQuestion.textContent = data.question + (data.zh ? " " + data.zh : "");
-    blankSentence.textContent = data.sentence;
+    // 中文题目添加悬停显示英文完整句
+    const bestAnswer = data.sentence.split("___").join(bestOf(data.options));
+    blankQuestion.innerHTML = "";
+    const span = document.createElement("span");
+    span.className = "hover-translation";
+    span.textContent = data.question + (data.zh ? " " + data.zh : "");
+    span.setAttribute("data-translation", bestAnswer);
+    blankQuestion.appendChild(span);
+    renderQuestionTags(blankTagBox, data.tags);
+
+    // 英文句子添加悬停显示中文
+    blankSentence.innerHTML = "";
+    const sentenceSpan = document.createElement("span");
+    sentenceSpan.className = "hover-translation";
+    sentenceSpan.textContent = data.sentence;
+    sentenceSpan.setAttribute("data-translation", data.question);
+    blankSentence.appendChild(sentenceSpan);
 
     // 打乱选项顺序（3~4 个候选词，等级藏在数据里）
-    const shuffled = shuffle(data.options.map(o => o.text));
+    const shuffled = shuffle(data.options);
 
     // 渲染选项
     shuffled.forEach(option => {
       const btn = document.createElement("button");
-      btn.className = "quiz-option";
-      btn.textContent = option;
-      btn.addEventListener("click", () => checkBlankAnswer(option, btn));
+      btn.className = "quiz-option hover-translation";
+      btn.textContent = option.word;
+      // 选项悬停显示该词的中文释义
+      const meaning = option.meaning || option.word;
+      btn.setAttribute("data-translation", meaning);
+      btn.addEventListener("click", () => checkBlankAnswer(option.word, btn));
       blankOptions.appendChild(btn);
     });
 
@@ -2453,7 +3657,6 @@ function checkBlankAnswer(selected, btn) {
   // 语感等级：前端直接从数据里查，点击即出（AI 不参与判断）
   const level = getLevel(selected, data.options);
   const best = bestOf(data.options);
-  const seq = ++feedbackSeq;
   // 填入结果（最佳=用户选的词，否则=应填的词）
   const filledSentence = data.sentence.split("___").join(selected);
   const bestSentence = data.sentence.split("___").join(best);
@@ -2465,16 +3668,19 @@ function checkBlankAnswer(selected, btn) {
       if (opt.textContent === best) opt.classList.add("correct");
     });
   }
-  blankFeedback.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
-  renderFeedback(blankFeedback, level, pickLocalFeedback(level, selected, best), level === "best" ? filledSentence : bestSentence);
-  speak(level === "best" ? filledSentence : bestSentence);
-
-  // AI 只写反馈文案（等级/配色不变）
-  upgradeFeedback(blankFeedback, seq, { sentence: data.sentence, word: selected, level: level });
-  trackEvent("select_word", { sentence: data.sentence, word: selected, level: level });
+  // 答错时对比「你填的整句」与「正确整句」，比只对比单个词更有学习价值
+  cfm({
+    level: level, selected: selected, best: best, fbBox: blankFeedback,
+    data: data, mode: "blank",
+    showAnswer: filledSentence,
+    cmpUser: filledSentence, cmpCorrect: bestSentence
+  });
 }
 
-document.getElementById("blankNext").addEventListener("click", () => loadBlankQuestion());
+document.getElementById("blankNext").addEventListener("click", () => {
+  if (guardRoundDone()) return;
+  loadBlankQuestion();
+});
 document.getElementById("blankCustom").addEventListener("click", () => {
   const text = prompt("请输入一句中文（例如：我想去看电影）");
   if (text && text.trim()) {
@@ -2564,9 +3770,653 @@ sceneTabsEl.querySelectorAll(".scene-tab").forEach(btn => {
   btn.addEventListener("click", () => setSceneTab(btn.dataset.scene));
 });
 
-// 初始化：开启「记住模式」则恢复上次所在模式，否则从查看模式开始
-// （必须在所有函数定义之后调用）
-switchMode(CFG.rememberMode ? CFG.mode : "view");
+// ================= 每日 10 分钟路径模式 =================
+// 用内置题库（含演示答案）直接出选择题；未配置 Key 也能练，不必每次联网
+const dailyInputPool = [];   // 本轮剩余题目
+let currentDailyData = null;
+let currentDailyIndex = 0;
+
+// 把内置题库转成一道选择题：候选 = 其他句子的地道表达 + 本句正确表达
+function buildDailyQuestion(zh) {
+  const item = canned[zh];
+  if (!item || !item.list || !item.list.length) return null;
+  const right = item.list[2];   // 地道表达
+  const pool = [];
+  // 干扰项：同一句的「更自然」+ 其他句子的地道表达（保证语义不同，一眼能排除）
+  if (item.list[1]) pool.push({ text: item.list[1].en, level: "acceptable", keyword: "", meaning: "" });
+  Object.keys(canned).forEach(k => {
+    if (k === zh) return;
+    const l = canned[k].list;
+    if (l && l[2]) pool.push({ text: l[2].en, level: "wrong", keyword: "", meaning: "" });
+  });
+  const distractors = shuffle(pool).slice(0, 2);
+  const options = shuffle([
+    { text: right.en, level: "best", keyword: "", meaning: "" }
+  ].concat(distractors));
+  if (options.length < 2) return null;
+  // 标签：用每日计划里的主题标签
+  return {
+    question: zh, options: options, tags: (todayPlan().tags || []).slice(0, 1).length
+      ? todayPlan().tags.slice(0, 1) : ["Daily"]
+  };
+}
+
+// 取下一道每日题（优先用未出过的句子）
+function nextDailyQuestion() {
+  while (dailyInputPool.length) {
+    const zh = dailyInputPool.shift();
+    const q = buildDailyQuestion(zh);
+    if (q) return q;
+  }
+  return null;
+}
+
+function loadDailyQuestion(customQ) {
+  const qBox = document.getElementById("dailyQuestion");
+  const oBox = document.getElementById("dailyOptions");
+  const fb = document.getElementById("dailyFeedback");
+  const tagBox = document.getElementById("dailyTags");
+  const hintEl = document.getElementById("dailyHint");
+  const plan = todayPlan();
+
+  fb.classList.remove("show");
+  fb.textContent = "";
+  oBox.innerHTML = "";
+  if (tagBox) tagBox.innerHTML = "";
+
+  let data = customQ;
+  if (!data) {
+    if (!dailyInputPool.length) {
+      // 用当天计划的题目池填充本轮
+      dayPool(plan.day).forEach(s => dailyInputPool.push(s));
+    }
+    data = nextDailyQuestion();
+  }
+  if (!data) {
+    qBox.textContent = "今天的题目出完了，明天再来 👋";
+    hintEl.textContent = "";
+    return;
+  }
+
+  currentDailyData = data;
+  currentDailyIndex++;
+  hintEl.textContent = "Day " + plan.day + " · " + plan.title + " · 今日第 " + progress.currentQuestionIndex + " 题";
+
+  qBox.innerHTML = "";
+  const span = document.createElement("span");
+  span.className = "hover-translation";
+  span.textContent = data.question;
+  span.setAttribute("data-translation", bestOf(data.options));
+  qBox.appendChild(span);
+  renderQuestionTags(tagBox, data.tags);
+
+  shuffle(data.options).forEach(option => {
+    const btn = document.createElement("button");
+    btn.className = "quiz-option";
+    btn.textContent = option.text;
+    if (option.meaning) btn.setAttribute("data-translation", option.keyword + " - " + option.meaning);
+    btn.addEventListener("click", () => checkDailyAnswer(option.text, btn));
+    oBox.appendChild(btn);
+  });
+}
+
+function checkDailyAnswer(selected, btn) {
+  const oBox = document.getElementById("dailyOptions");
+  const fb = document.getElementById("dailyFeedback");
+  const data = currentDailyData;
+  if (!data) return;
+  const allOptions = oBox.querySelectorAll(".quiz-option");
+  allOptions.forEach(o => o.classList.add("disabled"));
+
+  const level = getLevel(selected, data.options);
+  const best = bestOf(data.options);
+
+  btn.classList.add(LEVEL_BTN_CLS[level]);
+  if (level !== "best") {
+    allOptions.forEach(o => { if (o.textContent === best) o.classList.add("correct"); });
+  }
+  cfm({
+    level: level, selected: selected, best: best, fbBox: fb,
+    data: data, mode: "choice"
+  });
+}
+
+document.getElementById("dailyNext").addEventListener("click", () => {
+  if (guardRoundDone()) return;
+  loadDailyQuestion();
+});
+document.getElementById("dailyOpenPath").addEventListener("click", openDayPath);
+
+// ================= 表达树模式 =================
+// 分步骤构造句子：每一步选择都能实时看到句子被拼出来
+let currentTree = null;      // {base, zh, steps}
+let treePicked = [];         // 每一步已选的选项下标
+let treeRound = 0;
+
+const treeInputEl = document.getElementById("treeInput");
+const treePanelEl = document.getElementById("treePanel");
+const treeStepsEl = document.getElementById("treeSteps");
+const treePreviewEl = document.getElementById("treePreview");
+const treeZhEl = document.getElementById("treeZh");
+const treeLoadingEl = document.getElementById("treeLoading");
+const treeErrorEl = document.getElementById("treeError");
+const treeAgainBtn = document.getElementById("treeAgain");
+const treeSpeakBtn = document.getElementById("treeSpeak");
+const TREE_LOADING_TEXT = treeLoadingEl.textContent;
+
+// 用已选内容拼出完整句子；未选的槽位显示「…」
+function treeSentence() {
+  if (!currentTree) return "";
+  let s = currentTree.base;
+  currentTree.steps.forEach((st, i) => {
+    const pick = treePicked[i];
+    const word = (pick === null || pick === undefined) ? "…" : st.options[pick].text;
+    s = s.split("{" + i + "}").join(word);
+  });
+  return s.replace(/\s+/g, " ").trim();
+}
+function treeComplete() {
+  return currentTree && currentTree.steps.every((_, i) => treePicked[i] !== null && treePicked[i] !== undefined);
+}
+
+function renderTreePreview() {
+  if (!currentTree) return;
+  treePreviewEl.innerHTML = "";
+  // 按占位符拆开渲染：未填的槽位显示为虚线下划线，已填的高亮
+  const parts = currentTree.base.split(/(\{\d+\})/);
+  parts.forEach(p => {
+    const m = /^\{(\d+)\}$/.exec(p);
+    if (m) {
+      const i = Number(m[1]);
+      const pick = treePicked[i];
+      const slot = document.createElement("span");
+      slot.className = "slot" + (pick === null || pick === undefined ? "" : " filled");
+      slot.textContent = (pick === null || pick === undefined) ? "…" : currentTree.steps[i].options[pick].text;
+      treePreviewEl.appendChild(slot);
+    } else if (p) {
+      treePreviewEl.appendChild(document.createTextNode(p));
+    }
+  });
+  treeZhEl.textContent = currentTree.zh || "";
+}
+
+function renderTreeSteps() {
+  treeStepsEl.innerHTML = "";
+  currentTree.steps.forEach((st, i) => {
+    const wrap = document.createElement("div");
+    const done = treePicked[i] !== null && treePicked[i] !== undefined;
+    // 只有前一步选完，当前步才「激活」，营造逐步构造的感觉
+    const active = !done && currentTree.steps.slice(0, i).every((_, k) => treePicked[k] !== null && treePicked[k] !== undefined);
+    wrap.className = "tree-step" + (done ? " done" : "") + (active ? " active" : "");
+
+    const label = document.createElement("div");
+    label.className = "tree-step-label";
+    const idx = document.createElement("span");
+    idx.className = "ts-idx";
+    idx.textContent = done ? "✓" : (i + 1);
+    label.appendChild(idx);
+    label.appendChild(document.createTextNode("Step" + (i + 1) + "｜" + st.name));
+    if (done) {
+      const p = document.createElement("span");
+      p.className = "ts-picked";
+      p.textContent = st.options[treePicked[i]].text;
+      label.appendChild(p);
+    }
+    wrap.appendChild(label);
+
+    const opts = document.createElement("div");
+    opts.className = "tree-opts";
+    st.options.forEach((o, k) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "tree-opt" + (treePicked[i] === k ? " active" : "");
+      b.appendChild(document.createTextNode(o.text));
+      if (o.zh) {
+        const z = document.createElement("span");
+        z.className = "to-zh";
+        z.textContent = "(" + o.zh + ")";
+        b.appendChild(z);
+      }
+      b.addEventListener("click", () => {
+        treePicked[i] = k;
+        renderTreeSteps();
+        renderTreePreview();
+        updateTreeActions();
+      });
+      opts.appendChild(b);
+    });
+    wrap.appendChild(opts);
+    treeStepsEl.appendChild(wrap);
+  });
+}
+
+function updateTreeActions() {
+  const ok = treeComplete();
+  treeAgainBtn.disabled = !ok;
+  treeSpeakBtn.disabled = !ok;
+}
+
+async function runTree() {
+  const text = treeInputEl.value.trim();
+  if (!text) { treeInputEl.focus(); return; }
+  const btn = document.getElementById("treeGo");
+  btn.disabled = true;
+  treeErrorEl.textContent = "";
+  treeErrorEl.className = "";
+  treeLoadingEl.classList.add("show");
+  treeLoadingEl.textContent = TREE_LOADING_TEXT;
+  treePanelEl.hidden = true;
+  try {
+    if (!CFG.key) {
+      // 演示模式：用内置的橘子例子演示「分步构造」的交互
+      await delay(500);
+      currentTree = DEMO_TREE;
+    } else {
+      currentTree = await generateTree(text);
+    }
+    // 每步默认未选（null），让用户自己搭
+    treePicked = currentTree.steps.map(() => null);
+    treeRound++;
+    treePanelEl.hidden = false;
+    treeLoadingEl.classList.remove("show");
+    renderTreeSteps();
+    renderTreePreview();
+    updateTreeActions();
+    trackEvent("tree_start", { round: treeRound, steps: currentTree.steps.length });
+  } catch (err) {
+    treeLoadingEl.classList.remove("show");
+    treeErrorEl.className = "quiz-feedback show wrong-fb";
+    treeErrorEl.textContent = "生成失败：" + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// 演示模式的表达树样例（未填 Key 时也能体验分步构造）
+const DEMO_TREE = {
+  base: "I want a {0} orange {1}.",
+  zh: "我想吃一个…的橘子…。",
+  steps: [
+    { name: "选一个形容词", options: [
+      { text: "juicy", zh: "多汁的" }, { text: "fresh", zh: "新鲜的" }, { text: "sweet", zh: "甜的" }
+    ] },
+    { name: "选一个场景", options: [
+      { text: "for breakfast", zh: "当早餐" }, { text: "after dinner", zh: "饭后" }, { text: "right now", zh: "现在" }
+    ] }
+  ]
+};
+
+document.getElementById("treeGo").addEventListener("click", runTree);
+treeInputEl.addEventListener("keydown", e => { if (e.key === "Enter") runTree(); });
+document.getElementById("treeAgain").addEventListener("click", () => {
+  // 「再来一个表达」：同样的步骤结构重新选一遍（换个说法再搭一次）
+  if (!currentTree) return;
+  treePicked = currentTree.steps.map(() => null);
+  treeRound++;
+  renderTreeSteps();
+  renderTreePreview();
+  updateTreeActions();
+  treeInputEl.focus();
+  trackEvent("tree_again", { round: treeRound });
+});
+treeSpeakBtn.addEventListener("click", () => {
+  if (treeComplete()) speak(treeSentence());
+});
+
+// ================= ④ 错题本面板 =================
+function renderWrongBook() {
+  const body = document.getElementById("wrongBody");
+  body.innerHTML = "";
+  if (!wrongBook.length) {
+    const e = document.createElement("div");
+    e.className = "empty-hint";
+    e.innerHTML = '<span class="eh-ico">📕</span>错题本是空的<br>答错的题会自动收进来，之后优先再次出现';
+    body.appendChild(e);
+    document.getElementById("wrongPractice").disabled = true;
+    return;
+  }
+  document.getElementById("wrongPractice").disabled = false;
+  const note = document.createElement("p");
+  note.className = "wb-count-note";
+  note.textContent = "共 " + wrongBook.length + " 道错题。答错次数越多，在自由练习里出现的几率越高。";
+  body.appendChild(note);
+
+  wrongBook.forEach((w, i) => {
+    const d = document.createElement("div");
+    d.className = "wb-item";
+    const q = document.createElement("div");
+    q.className = "wb-q";
+    q.textContent = w.question;
+    d.appendChild(q);
+
+    const bestSentence = w.mode === "blank"
+      ? String(w.sentence || "").split("___").join(w.bestAnswer || "")
+      : (w.bestAnswer || "");
+    if (w.userAnswer) {
+      const u = document.createElement("div");
+      u.className = "wb-line user";
+      u.textContent = "❌ 你选的：" + w.userAnswer;
+      d.appendChild(u);
+    }
+    if (bestSentence) {
+      const b = document.createElement("div");
+      b.className = "wb-line best";
+      b.textContent = "✅ 正确：" + bestSentence;
+      d.appendChild(b);
+    }
+
+    const meta = document.createElement("div");
+    meta.className = "wb-meta";
+    const mode = document.createElement("span");
+    mode.className = "wb-mode";
+    mode.textContent = w.mode === "blank" ? "填空题" : "选择题";
+    meta.appendChild(mode);
+    (w.tags || []).forEach(t => {
+      const s = document.createElement("span");
+      s.textContent = tagLabel(t);
+      meta.appendChild(s);
+    });
+    const cnt = document.createElement("span");
+    cnt.textContent = "错 " + (w.wrongCount || 1) + " 次";
+    meta.appendChild(cnt);
+    const del = document.createElement("button");
+    del.className = "wb-del";
+    del.type = "button";
+    del.textContent = "移除";
+    del.addEventListener("click", () => removeWrong(i));
+    meta.appendChild(del);
+    d.appendChild(meta);
+
+    body.appendChild(d);
+  });
+}
+
+document.getElementById("btnWrong").addEventListener("click", () => {
+  renderWrongBook();
+  openOverlay("wrongBook");
+});
+document.getElementById("wrongClear").addEventListener("click", () => {
+  if (!wrongBook.length) return;
+  if (confirm("确定清空错题本吗？清空后无法恢复。")) clearWrong();
+});
+// 只练错题：整轮都用错题本里的题目（不重新请求 AI），错得多的先出
+document.getElementById("wrongPractice").addEventListener("click", () => {
+  if (!wrongBook.length) return;
+  closeOverlay("wrongBook");
+  const hasBlank = wrongBook.some(w => (w.mode || "choice") === "blank");
+  const mode = hasBlank ? "blank" : "choice";   // 优先练错题里更常见的题型
+  startRound(Math.min(Math.max(wrongBook.length, 3), DAILY_SIZE));
+  activeWrong = true;                           // 整轮锁定「只练错题」
+  switchMode(mode);                             // switchMode 会保留本轮来源，再出第一题
+});
+
+// ================= ⑤ 每日路径面板 =================
+function renderDayPath() {
+  const body = document.getElementById("dayBody");
+  body.innerHTML = "";
+  const cur = dayPlan.dayIndex % DAY_PLAN.length;
+  const todayDone = isTodayDone();
+
+  const note = document.createElement("p");
+  note.className = "wb-count-note";
+  note.textContent = todayDone
+    ? "今天已经练完啦 ✅ 想多练可以点下面的 Day" + (cur + 1) + " 再练一轮。"
+    : "每天 10 题，约 10 分钟。点今天的课程开始。";
+  body.appendChild(note);
+
+  const list = document.createElement("div");
+  list.className = "day-list";
+  DAY_PLAN.forEach((d, i) => {
+    const isToday = i === cur;
+    const isPast = i < cur || (isToday && todayDone);
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "day-card" + (isToday ? " today" : "") + (isPast ? " done" : "");
+
+    const no = document.createElement("div");
+    no.className = "dc-no";
+    const b = document.createElement("b");
+    b.textContent = isPast ? "✓" : "D" + d.day;
+    no.appendChild(b);
+    card.appendChild(no);
+
+    const info = document.createElement("div");
+    info.className = "dc-info";
+    const t = document.createElement("div");
+    t.className = "dc-title";
+    t.textContent = "Day " + d.day + " · " + d.title;
+    const s = document.createElement("div");
+    s.className = "dc-sub";
+    s.textContent = d.sub + (d.tags && d.tags.length ? "（" + d.tags.map(tagLabel).join(" / ") + "）" : "");
+    info.appendChild(t);
+    info.appendChild(s);
+    card.appendChild(info);
+
+    const st = document.createElement("div");
+    st.className = "dc-state";
+    st.textContent = isToday ? (todayDone ? "已完成" : "今天") : (isPast ? "已完成" : "未解锁");
+    card.appendChild(st);
+
+    card.addEventListener("click", () => {
+      closeOverlay("dayPath");
+      // 点任意一天都能直接练（不强制按顺序解锁，降低门槛）
+      if (i !== cur) dayPlan.dayIndex = i;
+      dailyInputPool.length = 0;
+      startDailyRound();
+    });
+    list.appendChild(card);
+  });
+  body.appendChild(list);
+}
+function openDayPath() { renderDayPath(); openOverlay("dayPath"); }
+document.getElementById("btnDay").addEventListener("click", openDayPath);
+
+// 开始一轮每日练习
+function startDailyRound() {
+  switchMode("daily");
+  startRound(DAILY_SIZE);
+  loadDailyQuestion();
+}
+
+// ================= ⑥ 场景标签面板 =================
+// 标签 → 内置题库里的句子（写死映射，保证未联网也能按标签练）
+const TAG_POOL_SOURCE = {
+  Food: ["我想吃一个橘子", "这道菜太咸了"],
+  Daily: ["别担心，慢慢来", "我明天要早起", "你今天看起来很累", "外面下雨了，记得带伞"],
+  Work: ["这个主意不错，但实施起来很难", "他说话太快了，我跟不上", "我对这个不太确定"],
+  Travel: ["我们什么时候出发", "这里的风景真美", "外面下雨了，记得带伞"],
+  Social: ["我们好久没见了", "周末你想做什么", "帮我一个忙好吗", "这部电影太感人了"],
+  Shopping: ["这双鞋穿着很舒服", "我对这个不太确定"],
+  Weather: ["外面下雨了，记得带伞", "我明天要早起"],
+  Other: ["我对这个不太确定", "帮我一个忙好吗"]
+};
+function tagPoolFor(tag) {
+  const src = TAG_POOL_SOURCE[tag] || [];
+  return src.filter(s => canned[s]);
+}
+function renderTagPicker() {
+  const body = document.getElementById("tagBody");
+  body.innerHTML = "";
+  const note = document.createElement("p");
+  note.className = "wb-count-note";
+  note.textContent = "选一个场景，用这个场景里最常用的句子来练。";
+  body.appendChild(note);
+
+  const wrap = document.createElement("div");
+  wrap.className = "tag-picker";
+  TAG_ORDER.forEach(tag => {
+    const n = tagPoolFor(tag).length;
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "tag-chip";
+    b.appendChild(document.createTextNode(tagLabel(tag)));
+    const c = document.createElement("span");
+    c.className = "tc-n";
+    c.textContent = "×" + n;
+    b.appendChild(c);
+    b.addEventListener("click", () => {
+      closeOverlay("tagPicker");
+      startTaggedRound(tag);
+    });
+    wrap.appendChild(b);
+  });
+  body.appendChild(wrap);
+}
+document.getElementById("btnTags").addEventListener("click", () => {
+  renderTagPicker();
+  openOverlay("tagPicker");
+});
+
+// 按标签开练：整轮都用该标签的题库出题（内置题库，不必联网）
+function startTaggedRound(tag) {
+  const pool = tagPoolFor(tag);
+  if (!pool.length) { alert("这个标签暂时还没有题目"); return; }
+  startRound(DAILY_SIZE);
+  activeTagPool = pool;     // 整轮锁定标签题库
+  switchMode("choice");
+}
+
+// ================= ⑦ 分享卡片（Canvas 绘制）=================
+function drawShareCard() {
+  const s = shareStats();
+  const c = document.getElementById("shareCanvas");
+  const ctx = c.getContext("2d");
+  const W = c.width, H = c.height;
+
+  // 背景渐变（与页面主色一致）
+  const g = ctx.createLinearGradient(0, 0, W, H);
+  g.addColorStop(0, "#667eea");
+  g.addColorStop(1, "#764ba2");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 白色卡片
+  const pad = 44;
+  ctx.fillStyle = "#fff";
+  roundRect(ctx, pad, pad, W - pad * 2, H - pad * 2, 32);
+  ctx.fill();
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#8a93bb";
+  ctx.font = "600 26px 'PingFang SC','Microsoft YaHei',sans-serif";
+  ctx.fillText("英语表达练习器", W / 2, pad + 92);
+
+  ctx.fillStyle = "#2b3150";
+  ctx.font = "800 46px 'PingFang SC','Microsoft YaHei',sans-serif";
+  ctx.fillText("Today I practiced English", W / 2, pad + 172);
+  ctx.fillText("for 10 minutes", W / 2, pad + 232);
+
+  ctx.strokeStyle = "#eceefa";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(pad + 70, pad + 292);
+  ctx.lineTo(W - pad - 70, pad + 292);
+  ctx.stroke();
+
+  // 三个数字
+  const rows = [
+    ["✔", s.today + " 道题", "#389e0d"],
+    ["◎", s.accuracy + "% 正确率", "#4a5ca8"],
+    ["🔥", s.streak + " 连对", "#d46b08"],
+    ["🏆", "最长 " + s.maxStreak + " 连对", "#8a6d3b"]
+  ];
+  let y = pad + 372;
+  rows.forEach(r => {
+    ctx.textAlign = "left";
+    ctx.font = "700 38px 'PingFang SC','Microsoft YaHei',sans-serif";
+    ctx.fillStyle = r[2];
+    ctx.fillText(r[0], pad + 84, y);
+    ctx.font = "800 40px 'PingFang SC','Microsoft YaHei',sans-serif";
+    ctx.fillStyle = "#2b3150";
+    ctx.fillText(r[1], pad + 148, y);
+    y += 82;
+  });
+
+  // 底部进度条：今日目标完成度
+  const barY = H - pad - 132, barW = W - pad * 2 - 150;
+  ctx.fillStyle = "#eceefa";
+  roundRect(ctx, pad + 75, barY, barW, 18, 9);
+  ctx.fill();
+  const pct = Math.min(s.today / DAILY_SIZE, 1);
+  if (pct > 0) {
+    ctx.fillStyle = "#667eea";
+    roundRect(ctx, pad + 75, barY, Math.max(barW * pct, 18), 18, 9);
+    ctx.fill();
+  }
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#9aa0b0";
+  ctx.font = "600 22px 'PingFang SC','Microsoft YaHei',sans-serif";
+  ctx.fillText("今日目标 " + Math.min(s.today, DAILY_SIZE) + " / " + DAILY_SIZE +
+    "　·　累计 " + s.total + " 题", W / 2, barY + 54);
+}
+// canvas 圆角矩形（兼容旧浏览器：没有 roundRect 就手动画路径）
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function openShare() {
+  drawShareCard();
+  openOverlay("shareBox");
+  trackEvent("share_open", shareStats());
+}
+document.getElementById("btnShare").addEventListener("click", openShare);
+
+// 分享卡下载：把 canvas 转成 PNG 存到本地
+document.getElementById("shareDownload").addEventListener("click", () => {
+  try {
+    const c = document.getElementById("shareCanvas");
+    const url = c.toDataURL("image/png");
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "英语练习-" + todayKey() + ".png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch (e) {
+    alert("下载失败：" + e.message);
+  }
+});
+// 分享卡复制到剪贴板
+document.getElementById("shareCopy").addEventListener("click", async () => {
+  const c = document.getElementById("shareCanvas");
+  try {
+    if (!navigator.clipboard || !window.ClipboardItem) throw new Error("当前浏览器不支持复制图片，请用「下载图片」");
+    const blob = await new Promise(res => c.toBlob(res, "image/png"));
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    const tip = document.querySelector(".share-tip");
+    if (tip) tip.textContent = "✅ 已复制到剪贴板，直接粘贴到聊天窗口即可。";
+  } catch (e) {
+    alert("复制失败：" + e.message);
+  }
+});
+
+// ================= 初始化 =================
+// 一次性把所有状态初始化集中到这里：常量赋值 → 跨天处理 → 顶部栏 → 恢复模式
+// 这样既避开 TDZ（updateTopBar 会被更早的代码调用），也让启动顺序一目了然
+function init() {
+  topBarEl = document.getElementById("topBar");
+  tbFill = document.getElementById("tbFill");
+  tbCount = document.getElementById("tbCount");
+  tbHint = document.getElementById("tbHint");
+  tbStreakEl = document.getElementById("tbStreak");
+  tbStreakNum = document.getElementById("tbStreakNum");
+  wrongBadge = document.getElementById("wrongBadge");
+
+  refreshDayIndex();   // 跨天则推进到下一个 Day
+  rollDayIfNeeded();   // 跨天则把「今日题数」清零
+  updateTopBar();      // 同步顶部进度条 / 🔥streak / 错题角标
+
+  // 演示模式且没有 Key 时，进度条先不上屏（查看模式本来也不显示），保持首屏清爽
+  switchMode(CFG.rememberMode ? CFG.mode : "view");
+}
+
+init();
 </script>
 </body>
 </html>
