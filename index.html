@@ -359,11 +359,59 @@
   #errorBox.show { display: block; }
   .demo-note { text-align: center; color: #bbb; font-size: 12px; margin-top: 14px; }
 
+  /* ===== 首页主入口：今日训练大卡片 ===== */
+  #homeHero { margin-bottom: 16px; }
+  .hero-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 18px; padding: 26px 24px 24px; color: #fff;
+    box-shadow: 0 12px 30px rgba(102,126,234,.32);
+    text-align: center; position: relative; overflow: hidden;
+  }
+  .hero-top {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    font-size: 13px; opacity: .92; margin-bottom: 14px;
+  }
+  .hero-flame { font-size: 16px; }
+  .hero-streak b { font-size: 15px; }
+  .hero-title { font-size: 27px; font-weight: 800; letter-spacing: .5px; }
+  .hero-sub { font-size: 13.5px; opacity: .88; margin-top: 8px; }
+  .hero-meta {
+    display: flex; gap: 8px; justify-content: center; flex-wrap: wrap;
+    margin-top: 14px; min-height: 0;
+  }
+  .hero-chip {
+    background: rgba(255,255,255,.18); border: 1px solid rgba(255,255,255,.28);
+    border-radius: 999px; padding: 5px 12px; font-size: 12.5px;
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  }
+  .hero-btn {
+    display: block; width: 100%; margin-top: 20px; border: none;
+    background: #fff; color: #5a63c8; font-weight: 800; font-size: 16px;
+    border-radius: 12px; padding: 14px; cursor: pointer; font-family: inherit;
+    transition: transform .12s, box-shadow .2s;
+    box-shadow: 0 6px 16px rgba(0,0,0,.14);
+  }
+  .hero-btn:hover { box-shadow: 0 8px 22px rgba(0,0,0,.2); }
+  .hero-btn:active { transform: scale(.98); }
+  .hero-card.done .hero-btn { background: rgba(255,255,255,.9); }
+
+  /* 自由练习折叠入口 */
+  .explore-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; margin-top: 12px; background: transparent; border: none;
+    color: #8a93bb; font-size: 13.5px; font-family: inherit; cursor: pointer;
+    padding: 8px; border-radius: 10px; transition: background .15s, color .15s;
+  }
+  .explore-toggle:hover { background: #f4f5fb; color: #667eea; }
+  .explore-toggle .ex-arrow { transition: transform .2s; font-size: 12px; }
+  .explore-toggle.open .ex-arrow { transform: rotate(180deg); }
+
   /* 练习模式切换 */
   .mode-selector {
     display: flex; gap: 8px; margin-bottom: 16px; justify-content: center;
     position: relative; z-index: 10; flex-wrap: wrap;
   }
+  .mode-selector[hidden] { display: none; }
   .mode-btn {
     flex: 1; max-width: 150px; background: #f5f5f5; color: #666; border: 2px solid #e8e8e8;
     border-radius: 10px; padding: 10px 16px; font-size: 14px; cursor: pointer;
@@ -824,6 +872,26 @@
   .done-title { font-size: 20px; font-weight: 800; color: #2b3150; text-align: center; margin-bottom: 6px; }
   .done-sub { font-size: 13.5px; color: #8a93bb; text-align: center; margin-bottom: 18px; line-height: 1.7; }
 
+  /* 完成页：今天学过的句子 */
+  .done-sentences {
+    background: #f7f9ff; border: 1px solid #e4e9fb; border-radius: 12px;
+    padding: 13px 14px; margin-bottom: 16px;
+  }
+  .done-sentences[hidden] { display: none; }
+  .done-sentences .ds-head {
+    font-size: 12px; font-weight: 700; color: #8a93bb; margin-bottom: 9px;
+    letter-spacing: .3px;
+  }
+  .done-sentences .ds-sentence {
+    display: flex; align-items: center; gap: 8px; padding: 5px 0;
+  }
+  .done-sentences .ds-tick { color: #52c41a; font-weight: 800; flex: 0 0 auto; }
+  .done-sentences .ds-en {
+    flex: 1; min-width: 0; font-size: 14px; color: #2b3150; line-height: 1.5;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .done-sentences .ds-speak { flex: 0 0 auto; }
+
   /* —— 顶部栏进度条在「查看模式」下的今日态 —— */
   .tb-today-hint { font-size: 11.5px; color: #a8adb8; margin-left: 2px; white-space: nowrap; }
   @media (max-width: 640px) { .tb-today-hint { display: none; } }
@@ -837,7 +905,7 @@
       <span class="tb-count" id="tbCount">0 / 10</span>
       <span class="tb-today-hint" id="tbHint">今日目标 0/10</span>
     </div>
-    <div class="tb-streak" id="tbStreak" title="连续答对次数">
+    <div class="tb-streak" id="tbStreak" title="连续打卡天数">
       <span class="tb-flame">🔥</span><span id="tbStreakNum">0</span>
     </div>
     <button class="tb-btn" id="btnDay" type="button" title="每日 10 分钟路径">📅</button>
@@ -921,12 +989,13 @@
   <div class="overlay" id="doneSheet">
     <div class="sheet" style="height:auto;max-height:calc(100vh - 48px);">
       <div class="sheet-body" style="padding:26px 24px;">
-        <div class="done-title" id="doneTitle">🎉 今日完成</div>
+        <div class="done-title" id="doneTitle">🎉 今日训练完成！</div>
         <div class="done-sub" id="doneSub"></div>
         <div class="done-stats" id="doneStats"></div>
+        <div class="done-sentences" id="doneSentences" hidden></div>
         <div class="share-actions">
-          <button id="doneShare" class="btn-primary" style="flex:1;">📤 生成分享卡片</button>
-          <button id="doneClose" class="btn-outline" style="flex:1;">继续练习</button>
+          <button id="doneShare" class="btn-primary" style="flex:1;">📸 生成分享卡片</button>
+          <button id="doneClose" class="btn-outline" style="flex:1;">再练一组</button>
         </div>
       </div>
     </div>
@@ -934,16 +1003,33 @@
 
   <div class="card">
     <h1>英语表达练习器<span id="modeTag" class="tag demo">演示模式</span></h1>
-    <p class="sub">输入一句中文：给出 基础表达 / 更自然的说法 / 地道表达 + 常见错误 + 使用场景；输入单词：查词造句</p>
 
-    <!-- 练习模式切换 -->
-    <div class="mode-selector">
-      <button class="mode-btn" data-mode="daily">每日路径</button>
-      <button class="mode-btn active" data-mode="view">查看模式</button>
+    <!-- ① 今日训练主卡片（首页唯一主入口，居中高亮） -->
+    <section id="homeHero">
+      <div class="hero-card">
+        <div class="hero-top">
+          <span class="hero-flame">🔥</span>
+          <span class="hero-streak"><b id="heroStreakNum">0</b> 天连续打卡</span>
+        </div>
+        <div class="hero-title">今日训练</div>
+        <div class="hero-sub" id="heroSub">每天 10 题，约 10 分钟</div>
+        <div class="hero-meta" id="heroMeta"></div>
+        <button id="heroStart" class="hero-btn">开始今日训练</button>
+      </div>
+      <button type="button" id="toggleExplore" class="explore-toggle">
+        <span>自由练习</span>
+        <span class="ex-arrow" id="exploreArrow">▾</span>
+      </button>
+    </section>
+
+    <!-- ② 自由练习：收纳其余模式（默认折叠） -->
+    <div class="mode-selector" id="explorePanel" hidden>
+      <button class="mode-btn" data-mode="view">查看表达</button>
       <button class="mode-btn" data-mode="scene">场景表达</button>
       <button class="mode-btn" data-mode="tree">表达树</button>
       <button class="mode-btn" data-mode="choice">选择题</button>
       <button class="mode-btn" data-mode="blank">填空题</button>
+      <button class="mode-btn" data-mode="daily">每日路径</button>
     </div>
 
     <div class="settings-toggle"><button id="toggleSettings">⚙ 设置</button></div>
@@ -1896,7 +1982,8 @@ const LS = {
   wrong: "eng_wrong",           // 错题本 Question[]
   daily: "eng_daily",           // 每日路径打卡 {dayIndex, doneDates[]}
   session: "eng_session",       // 上一轮练习的小结（用于完成面板/分享卡）
-  lastPractice: "eng_last_practice"  // 上次练习日期，用于跨天判定
+  lastPractice: "eng_last_practice",  // 上次练习日期，用于跨天判定
+  train: "eng_train"            // 训练打卡账本 {streak, lastDate, history[]}
 };
 
 function lsGet(key, fallback) {
@@ -1930,7 +2017,10 @@ if (typeof progress.streak !== "number") progress.streak = 0;
 if (typeof progress.maxStreak !== "number") progress.maxStreak = 0;
 
 // —— 统计（今日 + 累计）——
-let stats = lsGet(LS.stats, null) || { date: todayKey(), todayDone: 0, totalDone: 0, correct: 0, total: 0 };
+// todayDone: 今日已答题数；todayCorrect: 今日答对数（用于分享卡「今日正确率」）
+// correct/total: 累计答对 / 累计作答（用于「累计正确率」）
+let stats = lsGet(LS.stats, null) || { date: todayKey(), todayDone: 0, todayCorrect: 0, totalDone: 0, correct: 0, total: 0 };
+if (typeof stats.todayCorrect !== "number" || stats.todayCorrect < 0) stats.todayCorrect = 0;
 
 // —— 错题本 ——
 let wrongBook = lsGet(LS.wrong, []) || [];
@@ -1942,12 +2032,88 @@ const dayPlan = lsGet(LS.daily, null) || {
   doneDates: []         // 已完成的日期，避免重复计数
 };
 
+// —— 训练打卡账本（streak = 连续打卡天数，与「答对」无关）——
+// {streak: 当前连续天数, max: 历史最长连续天数, lastDate: 上次打卡日期, history: [{date, accuracy, total}]}
+let trainLog = lsGet(LS.train, null) || { streak: 0, max: 0, lastDate: "", history: [] };
+if (typeof trainLog.streak !== "number" || trainLog.streak < 0) trainLog.streak = 0;
+if (typeof trainLog.max !== "number" || trainLog.max < 0) trainLog.max = trainLog.streak;
+if (typeof trainLog.lastDate !== "string") trainLog.lastDate = "";
+if (!Array.isArray(trainLog.history)) trainLog.history = [];
+
+// 两个日期相差几天（用于判断是否连续打卡）
+function dayDiff(a, b) {
+  const pa = a.split("-").map(Number), pb = b.split("-").map(Number);
+  const ta = new Date(pa[0], pa[1] - 1, pa[2]).getTime();
+  const tb = new Date(pb[0], pb[1] - 1, pb[2]).getTime();
+  return Math.round((tb - ta) / 86400000);
+}
+
+// 今天完成一整轮训练 → 记一次打卡：
+//   · 昨天也练过  → streak +1（连续）
+//   · 上次非昨天  → streak 重置为 1（中断）
+//   · 今天已记过  → 不重复计数（只更新当天成绩）
+// 返回 {streak, isNew, continued}
+function logTraining(accuracy, total) {
+  const t = todayKey();
+  const rec = { date: t, accuracy: accuracy, total: total };
+  const existing = trainLog.history.find(h => h.date === t);
+
+  let isNew = false, continued = false;
+  if (existing) {
+    // 今天已打卡：只刷新当天正确率，不重复 +1 天
+    existing.accuracy = accuracy;
+    existing.total = total;
+  } else {
+    isNew = true;
+    if (trainLog.lastDate && dayDiff(trainLog.lastDate, t) === 1) {
+      trainLog.streak += 1;      // 昨天练过 → 连续
+      continued = true;
+    } else {
+      trainLog.streak = 1;       // 首次或中断后重来
+    }
+    if (trainLog.streak > (trainLog.max || 0)) trainLog.max = trainLog.streak;  // 刷新历史最长
+    trainLog.lastDate = t;
+    trainLog.history.unshift(rec);
+    while (trainLog.history.length > 90) trainLog.history.pop();  // 保留约三个月
+  }
+  lsSet(LS.train, trainLog);
+  return { streak: trainLog.streak, isNew: isNew, continued: continued };
+}
+
+// 若昨天没练、今天也没练，展示时应把已断的 streak 归零（不写入，仅用于显示）
+function displayStreak() {
+  const t = todayKey();
+  if (!trainLog.lastDate) return 0;
+  const gap = dayDiff(trainLog.lastDate, t);
+  if (gap <= 0) return trainLog.streak;   // 今天或未来已打卡
+  if (gap === 1) return trainLog.streak;  // 昨天练过，今天还没练 → 连续仍成立
+  return 0;                               // 断了好几天 → 显示为 0
+}
+
+// —— 今日学过的句子（完成页 / 分享卡展示）——
+// 只保留当天、去重、最新的若干条地道表达
+let todayLearned = [];   // [{en, zh}]
+function rememberLearned(zh, en) {
+  if (!en) return;
+  const hit = todayLearned.find(x => x.en === en);
+  if (hit) { hit.zh = zh || hit.zh; return; }
+  todayLearned.unshift({ en: en, zh: zh || "" });
+  while (todayLearned.length > 6) todayLearned.pop();
+}
+// 跨天则清空（懒清理：读取时判断日期）
+let learnedDate = todayKey();
+function todaySentences() {
+  if (learnedDate !== todayKey()) { todayLearned = []; learnedDate = todayKey(); }
+  return todayLearned.slice();
+}
+
 // 今日数据重置：跨天时把今日计数清零（练习时调用）
 function rollDayIfNeeded() {
   const t = todayKey();
   if (stats.date !== t) {
     stats.date = t;
     stats.todayDone = 0;
+    stats.todayCorrect = 0;
     lsSet(LS.stats, stats);
   }
 }
@@ -1964,7 +2130,7 @@ function updateTopBar() {
   tbFill.style.width = pct + "%";
   tbFill.classList.toggle("full", idx >= total);
   tbCount.textContent = idx + " / " + total;
-  tbStreakNum.textContent = progress.streak;
+  tbStreakNum.textContent = displayStreak();
   tbHint.textContent = "今日 " + stats.todayDone + "/" + DAILY_SIZE + " 题";
 
   const n = wrongBook.length;
@@ -1972,6 +2138,8 @@ function updateTopBar() {
   wrongBadge.hidden = n === 0;
   lsSet(LS.progress, progress);
   lsSet(LS.stats, stats);
+  // 首页卡片若正显示，同步刷新（打卡天数 / 今日进度 / 完成态）
+  if (homeHero && !homeHero.hidden) refreshHome();
 }
 
 // 开始一轮练习：重置进度与 streak，并清掉上一轮的练习来源
@@ -2010,25 +2178,23 @@ function recordAnswer(level) {
   stats.todayDone++;
   stats.totalDone++;
   stats.total++;
-  if (correct) stats.correct++;
+  if (correct) { stats.correct++; stats.todayCorrect++; }
 
   updateTopBar();
-  if (correct) {
-    // 答对：🔥 弹一下（轻微动画）
-    tbStreakEl.classList.remove("broken");
-    tbStreakEl.classList.add("bump");
-    setTimeout(() => tbStreakEl.classList.remove("bump"), 520);
-  } else if (prev > 0) {
-    // 中断且之前有连续 → ❌ streak broken 抖动
-    tbStreakEl.classList.add("broken");
-    setTimeout(() => tbStreakEl.classList.remove("broken"), 700);
-  }
 
   trackEvent("answer", {
     level: level, streak: progress.streak, correct: correct,
     index: progress.currentQuestionIndex
   });
   return { streak: progress.streak, broke: !correct && prev > 0, maxStreak: progress.maxStreak, prev: prev };
+}
+
+// 打卡天数增加时，让顶部 🔥 跳动一下（每日首次完成训练时触发）
+function bumpFlame() {
+  if (!tbStreakEl) return;
+  tbStreakEl.classList.remove("broken");
+  tbStreakEl.classList.add("bump");
+  setTimeout(() => tbStreakEl.classList.remove("bump"), 520);
 }
 
 // 本轮是否已练完
@@ -2146,17 +2312,21 @@ function isTodayDone() {
 }
 
 // —— ⑦ 分享卡数据 ——
-// 今日练习题数 / 正确率 / streak / 最长连续
+// 今日题数 / 今日正确率 / 打卡天数（streak）/ 累计 / 今日学过的句子
 function shareStats() {
   const today = stats.todayDone;
-  const acc = stats.total ? Math.round(stats.correct / stats.total * 100) : 0;
+  // 今日正确率：用「今日答对数 / 今日作答数」；没答过题时回退到累计正确率
+  const acc = today
+    ? Math.round(stats.todayCorrect / today * 100)
+    : (stats.total ? Math.round(stats.correct / stats.total * 100) : 0);
   return {
     today: today,
     accuracy: acc,
-    streak: progress.streak,
-    maxStreak: progress.maxStreak,
+    streak: displayStreak(),        // 🔥 连续打卡天数
+    maxStreak: trainLog.max || 0,   // 历史最长连续打卡天数
     total: stats.totalDone,
-    day: todayPlan().day
+    day: todayPlan().day,
+    sentences: todaySentences()     // 今天学过的英文句子
   };
 }
 
@@ -2667,12 +2837,27 @@ const blankMode = document.getElementById("blankMode");
 const treeMode = document.getElementById("treeMode");
 const dailyMode = document.getElementById("dailyMode");
 const modeButtons = document.querySelectorAll(".mode-btn");
+// 首页主入口相关
+const homeHero = document.getElementById("homeHero");
+const explorePanel = document.getElementById("explorePanel");
+const exploreArrow = document.getElementById("exploreArrow");
+const toggleExploreBtn = document.getElementById("toggleExplore");
+const heroStartBtn = document.getElementById("heroStart");
+const heroStreakNum = document.getElementById("heroStreakNum");
+const heroSubEl = document.getElementById("heroSub");
+const heroMetaEl = document.getElementById("heroMeta");
+const heroCardEl = document.querySelector(".hero-card");
 
 // 模式切换逻辑
 function switchMode(mode) {
-  CFG.mode = mode;
-  // 开启「记住上次练习模式」时才把当前模式存入本地；否则不记录（每次刷新从查看模式开始）
-  if (CFG.rememberMode) {
+  // 进入任何具体模式时收起首页主卡片（"home" 是首页态，不属任何模式）
+  const isHome = mode === "home";
+  if (homeHero) homeHero.hidden = !isHome;
+  if (!isHome) setExploreOpen(false);
+  if (!isHome) CFG.mode = mode;
+
+  // 开启「记住上次练习模式」时才把当前模式存入本地；否则不记录（每次刷新从首页开始）
+  if (!isHome && CFG.rememberMode) {
     localStorage.setItem("practice_mode", mode);
   }
 
@@ -2720,6 +2905,54 @@ function switchMode(mode) {
 modeButtons.forEach(btn => {
   btn.addEventListener("click", () => switchMode(btn.dataset.mode));
 });
+
+// ===== 首页：今日训练主卡片 =====
+// 展开/收起「自由练习」模式列表
+function setExploreOpen(open) {
+  if (!explorePanel) return;
+  explorePanel.hidden = !open;
+  toggleExploreBtn.classList.toggle("open", !!open);
+  toggleExploreBtn.querySelector("span").textContent = open ? "收起" : "自由练习";
+}
+toggleExploreBtn.addEventListener("click", () => {
+  setExploreOpen(explorePanel.hidden);
+});
+
+// 刷新首页卡片：🔥打卡天数 / 今日进度 / 是否已完成
+function refreshHome() {
+  if (!homeHero) return;
+  heroStreakNum.textContent = displayStreak();
+  const done = stats.todayDone || 0;
+  const goal = DAILY_SIZE;
+  const plan = todayPlan();
+  heroSubEl.textContent = isTodayDone()
+    ? "今天已经练完啦，可以再做一组巩固。"
+    : "Day " + plan.day + " · " + plan.title + "　约 10 分钟";
+  heroMetaEl.innerHTML = "";
+  const chips = [
+    "🎯 今日 " + done + "/" + goal + " 题",
+    "🔥 " + displayStreak() + " 天连续",
+    "📕 错题 " + wrongBook.length + " 道"
+  ];
+  chips.forEach(txt => {
+    const c = document.createElement("span");
+    c.className = "hero-chip";
+    c.textContent = txt;
+    heroMetaEl.appendChild(c);
+  });
+  heroStartBtn.textContent = isTodayDone() ? "再练一组" : "开始今日训练";
+  renderDoneHighlight();
+}
+// 今日已练完时给卡片一个「已完成」样式
+function renderDoneHighlight() {
+  if (heroCardEl) heroCardEl.classList.toggle("done", isTodayDone());
+}
+
+// 开始今日训练：进入每日路径并加载第一题
+heroStartBtn.addEventListener("click", () => {
+  startDailyRound();
+});
+
 
 function refreshModeUI() {
   if (CFG.key) {
@@ -3298,13 +3531,20 @@ document.addEventListener("keydown", e => {
 
 // 本轮练完的完成面板：展示今日题数 / 正确率 / streak，并提供分享与继续
 function openDone() {
-  const s = shareStats();
   const plan = todayPlan();
   const isDaily = CFG.mode === "daily";
   // 每日路径练完一整轮 → 打卡，明天 Day 自动 +1
   const firstTimeToday = isDaily ? markDayDone() : false;
+  // 今天首次练完一整轮 → 记一次打卡（连续天数 +1 或重置为 1）
+  const log = logTraining(
+    stats.todayDone ? Math.round(stats.todayCorrect / stats.todayDone * 100) : 0,
+    stats.todayDone
+  );
+  const s = shareStats();
+  if (log.isNew) bumpFlame();   // 打卡天数增加 → 顶部 🔥 跳动
+
   document.getElementById("doneTitle").textContent =
-    isDaily ? "🎉 今日完成" : "🎉 这一轮练完啦";
+    isDaily ? "🎉 今日训练完成！" : "🎉 这一轮练完啦";
   document.getElementById("doneSub").textContent = isDaily
     ? "Day " + plan.day + " · " + plan.title + (firstTimeToday
         ? " 已完成，明天继续下一课。"
@@ -3312,21 +3552,59 @@ function openDone() {
     : "做满 " + progress.totalQuestions + " 题了，休息一下，或者再来一轮。";
   const stats_ = document.getElementById("doneStats");
   stats_.innerHTML = "";
-  [["今日题数", s.today, ""], ["正确率", s.accuracy + "%", "r1"], ["🔥 连续", s.streak, "r2"]]
-    .forEach(([lbl, num, cls]) => {
-      const d = document.createElement("div");
-      d.className = "done-stat " + cls;
-      const n = document.createElement("div");
-      n.className = "ds-num";
-      n.textContent = num;
-      const l = document.createElement("div");
-      l.className = "ds-lbl";
-      l.textContent = lbl;
-      d.appendChild(n); d.appendChild(l);
-      stats_.appendChild(d);
-    });
+  [
+    ["完成题数", s.today + " / " + progress.totalQuestions, ""],
+    ["正确率", s.accuracy + "%", "r1"],
+    ["🔥 连续", s.streak + " 天", "r2"]
+  ].forEach(([lbl, num, cls]) => {
+    const d = document.createElement("div");
+    d.className = "done-stat " + cls;
+    const n = document.createElement("div");
+    n.className = "ds-num";
+    n.textContent = num;
+    const l = document.createElement("div");
+    l.className = "ds-lbl";
+    l.textContent = lbl;
+    d.appendChild(n); d.appendChild(l);
+    stats_.appendChild(d);
+  });
+  renderDoneSentences(s.sentences);
   openOverlay("doneSheet");
   trackEvent("round_done", { today: s.today, accuracy: s.accuracy, streak: s.streak });
+}
+
+// 完成页「今天学过的句子」：展示本轮 2~3 个最佳表达
+function renderDoneSentences(sentences) {
+  const box = document.getElementById("doneSentences");
+  if (!box) return;
+  box.innerHTML = "";
+  const list = (sentences || []).slice(0, 3);
+  if (!list.length) { box.hidden = true; return; }
+  box.hidden = false;
+  const h = document.createElement("div");
+  h.className = "ds-head";
+  h.textContent = "今天学过的句子";
+  box.appendChild(h);
+  list.forEach(item => {
+    const row = document.createElement("div");
+    row.className = "ds-sentence";
+    const tick = document.createElement("span");
+    tick.className = "ds-tick";
+    tick.textContent = "✔";
+    const en = document.createElement("span");
+    en.className = "ds-en";
+    en.textContent = item.en;
+    row.appendChild(tick);
+    row.appendChild(en);
+    const spk = document.createElement("button");
+    spk.type = "button";
+    spk.className = "speak ds-speak";
+    spk.title = "朗读";
+    spk.innerHTML = SPEAK_ICON;
+    spk.addEventListener("click", () => speak(item.en));
+    row.appendChild(spk);
+    box.appendChild(row);
+  });
 }
 document.getElementById("doneClose").addEventListener("click", () => {
   closeOverlay("doneSheet");
@@ -3504,11 +3782,11 @@ function removeWrongByQuestion(question, mode) {
 // rec 来自 recordAnswer()，返回 {streak, broke, maxStreak, prev}
 function afterAnswer(level, rec, fbBox) {
   if (rec.broke) {
-    // streak 中断要有明确反馈（多邻国式：❌ streak broken）
+    // 连对中断要有明确反馈（这里说的是「连续答对」，与顶部🔥打卡天数不是一回事）
     const note = document.createElement("div");
     note.className = "fb-reason";
     note.style.background = "rgba(255,77,79,.12)";
-    note.textContent = "❌ streak broken（中断，之前连续 " + rec.prev + " 题）";
+    note.textContent = "连对中断了（之前连续答对 " + rec.prev + " 题，重新开始）";
     (fbBox || document.getElementById("choiceFeedback")).appendChild(note);
   }
   // 每逢整轮完成，延迟一点弹完成面板（先让用户看完本题反馈）
@@ -3543,6 +3821,8 @@ function cfm(cur) {
   // 记进度 / streak；答错收进错题本
   const rec = recordAnswer(level);
   if (cur.data) {
+    // 今天学过的句子：本题的最佳表达（完成页/分享卡展示）
+    rememberLearned(cur.data.question, best);
     if (level !== "best") {
       addWrong({
         question: cur.data.question, options: cur.data.options, mode: cur.mode,
@@ -4317,8 +4597,8 @@ function drawShareCard() {
   const rows = [
     ["✔", s.today + " 道题", "#389e0d"],
     ["◎", s.accuracy + "% 正确率", "#4a5ca8"],
-    ["🔥", s.streak + " 连对", "#d46b08"],
-    ["🏆", "最长 " + s.maxStreak + " 连对", "#8a6d3b"]
+    ["🔥", s.streak + " 天连续", "#d46b08"],
+    ["🏆", "最长 " + s.maxStreak + " 天连续", "#8a6d3b"]
   ];
   let y = pad + 372;
   rows.forEach(r => {
@@ -4412,8 +4692,10 @@ function init() {
   rollDayIfNeeded();   // 跨天则把「今日题数」清零
   updateTopBar();      // 同步顶部进度条 / 🔥streak / 错题角标
 
-  // 演示模式且没有 Key 时，进度条先不上屏（查看模式本来也不显示），保持首屏清爽
-  switchMode(CFG.rememberMode ? CFG.mode : "view");
+  // 默认落在首页（今日训练大卡片），让用户「不思考 → 直接开始练」；
+  // 只有开启「记住上次模式」时才恢复到上次的具体模式
+  switchMode(CFG.rememberMode ? CFG.mode : "home");
+  refreshHome();       // 刷新首页卡片的打卡天数 / 今日进度 / 完成态
 }
 
 init();
