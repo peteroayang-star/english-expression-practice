@@ -5,3 +5,4 @@ server.log
 *.png
 shot_*.html
 dom.txt
+.tmpcheck/

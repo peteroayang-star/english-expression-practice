@@ -8,6 +8,8 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23667eea'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3EAb%3C/text%3E%3C/svg%3E">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* 键盘焦点必须可见：只对键盘导航显示焦点环，鼠标点击不显示 */
+  :focus-visible { outline: 3px solid #4a5ca8; outline-offset: 2px; border-radius: 6px; }
   body {
     font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -33,6 +35,7 @@
   }
   #modeTag.demo { background: #fff7e6; color: #d48806; border: 1px solid #ffd591; }
   #modeTag.online { background: #f6ffed; color: #52c41a; border: 1px solid #b7eb8f; }
+  #modeTag.pending { background: #f0f5ff; color: #2f54eb; border: 1px solid #adc6ff; }
 
   .settings-toggle {
     text-align: right; margin-bottom: 14px;
@@ -335,7 +338,9 @@
   .speak svg { width: 15px; height: 15px; }
   .en { font-size: 18px; color: #222; margin-top: 6px; line-height: 1.5; }
   .en .english { color: #667eea; font-weight: bold; }
-  .zh { font-size: 14px; color: #888; margin-top: 2px; }
+  /* 正文小字用 #6b7280（对白底 ≈4.8:1，达到 AA）；原来的 #888 只有 3.4:1，偏浅看不清 */
+  .zh { font-size: 14px; color: #6b7280; margin-top: 2px; line-height: 1.6; }
+  .zh:empty { display: none; }
   .result.def { border-left-color: #722ed1; background: #fbfaff; }
   .en .blank {
     background: #fff1b8; color: #ad6800; border-radius: 4px; padding: 0 5px;
@@ -343,15 +348,26 @@
   }
   .en .blank.filled { background: #e6fffb; color: #08979c; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+  .chips-note { font-size: 12px; color: #ad6800; margin-top: 8px; line-height: 1.6; }
   .chip {
     flex: 0 0 auto; background: #fff; border: 1px solid #13c2c2; color: #08979c;
     border-radius: 999px; padding: 4px 14px; font-size: 13px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; font-family: inherit;
   }
   .chip:hover { background: #e6fffb; }
+  /* 系统推荐词的小标签（不只靠颜色区分推荐 / 用户选择） */
+  .chip .chip-reco {
+    font-size: 10.5px; font-weight: 700; color: #389e0d;
+    background: #f6ffed; border: 1px solid #b7eb8f; border-radius: 4px; padding: 0 4px;
+  }
   /* 候选词点击后的语感三档配色（best/acceptable/wrong） */
   .chip.correct { background: #f6ffed; border-color: #52c41a; color: #389e0d; font-weight: bold; }
+  .chip.correct .chip-reco { background: #fff; }
   .chip.maybe { background: #fffbe6; border-color: #faad14; color: #ad6800; }
   .chip.wrong { background: #fff2f0; border-color: #ff4d4f; color: #cf1322; }
+  /* 用户选中的词：加粗边框 + 对勾前缀，与「推荐」标签一起表明身份 */
+  .chip.selected { box-shadow: 0 0 0 2px rgba(102,126,234,.35); }
+  .chip.selected::before { content: "你选"; font-size: 10.5px; font-weight: 700; opacity: .8; }
   .loading { text-align: center; color: #999; padding: 20px; display: none; }
   .loading.show { display: block; }
   #errorBox {
@@ -486,6 +502,22 @@
   }
   /* 填空题题目句 + 朗读按钮 */
   .q-line { display: flex; align-items: center; justify-content: center; gap: 4px; margin-top: 12px; }
+  /* 作答后：空位里真实填上用户选的词（答对绿、答错红），下面再补正确整句 */
+  #blankSentence { flex-wrap: wrap; }
+  .blank-filled {
+    display: inline-block; border-radius: 6px; padding: 1px 6px; font-weight: bold;
+  }
+  .blank-filled.ok { background: #e6fffb; color: #08979c; }
+  .blank-filled.bad {
+    background: #fff1f0; color: #cf1322;
+    text-decoration: line-through; text-decoration-color: rgba(207,19,34,.45);
+  }
+  .blank-right {
+    flex: 1 0 100%; margin-top: 8px; font-size: 15px;
+    color: #237804; font-weight: 600; text-align: center;
+    background: #f6ffed; border: 1px solid #d9f7be; border-radius: 8px;
+    padding: 8px 12px;
+  }
   .quiz-options {
     display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px;
   }
@@ -527,10 +559,11 @@
   .result .quiz-feedback { margin: 12px 0 0; }
   .quiz-controls {
     display: flex; gap: 10px; justify-content: center;
+    flex-wrap: wrap;   /* 窄屏（375px）下三个按钮放不下一行 → 自然换行，不横向溢出 */
   }
   .quiz-controls button {
-    flex: 0 0 auto; min-width: 120px; border: none; border-radius: 10px;
-    padding: 12px 20px; font-size: 16px; cursor: pointer; transition: opacity .2s;
+    flex: 1 1 auto; min-width: 104px; border: none; border-radius: 10px;
+    padding: 12px 16px; font-size: 15px; cursor: pointer; transition: opacity .2s;
   }
   /* 每个练习模式的「下一题」都用同一种紫底主按钮 */
   #choiceNext, #blankNext, #dailyNext {
@@ -538,6 +571,38 @@
   }
   #choiceCustom, #blankCustom, #dailyOpenPath {
     background: #f5f5f5; color: #666;
+  }
+  .quiz-controls .btn-ghost {
+    background: #fff; color: #6b7288; border: 1px solid #e3e6f2;
+    font-weight: 600;
+  }
+  .quiz-controls .btn-ghost:hover { background: #f7f8ff; border-color: #c9d1f0; color: #667eea; }
+  .quiz-controls button:disabled { opacity: .5; cursor: not-allowed; }
+
+  /* 提示入口：作答前主动获取「词义 / 语境」提示（不再靠悬停泄露答案） */
+  .q-hint-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin: -8px 0 14px;
+  }
+  .q-hint-btn {
+    flex: 0 0 auto; background: #fffbe6; color: #ad6800;
+    border: 1px solid #ffe58f; border-radius: 999px;
+    padding: 7px 15px; font-size: 13px; font-family: inherit;
+    cursor: pointer; transition: background .15s, border-color .15s;
+  }
+  .q-hint-btn:hover { background: #fff7cc; border-color: #ffd666; }
+  .q-hint-btn[aria-pressed="true"] { background: #fff1b8; border-color: #ffd591; }
+  .q-hint-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .q-hint-out {
+    flex: 1 1 auto; min-width: 0; font-size: 13px; color: #7a6a2f;
+    background: #fffdf5; border: 1px dashed #ffe58f; border-radius: 9px;
+    padding: 8px 12px; line-height: 1.6;
+  }
+  .q-hint-out[hidden] { display: none; }
+
+  /* 等级说明行：把「可以使用」和「有误」明确分开 */
+  .quiz-feedback .fb-level {
+    margin-top: 7px; font-size: 12.5px; font-weight: 600; opacity: .8;
   }
 
   /* 场景表达模式 */
@@ -682,71 +747,124 @@
     background: #eef1fd; color: #5a6bc4; border: 1px solid #dde2f8;
   }
 
-  /* —— ③ 表达树模式 —— */
+  /* —— ③ 句子搭建模式（内部沿用 tree 标识）—— */
+  .tree-intro { font-size: 13px; color: #8a93bb; margin: 0 0 12px; line-height: 1.6; }
+  /* 生成成功后输入区收成「当前表达 + 修改」 */
+  #treeInputSummary {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: #f7f9ff; border: 1px solid #e4e9fb; border-radius: 10px;
+    padding: 10px 13px; margin-bottom: 16px;
+  }
+  #treeInputSummary .tis-label { font-size: 12px; font-weight: 700; color: #8a93bb; flex: 0 0 auto; }
+  #treeInputSummary .tis-text {
+    flex: 1; min-width: 0; font-size: 14px; color: #2b3150; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  /* 生成按钮 → 结果区：留出约 24px 呼吸空间（二.7） */
+  #treePanel { margin-top: 24px; }
   .tree-wrap { margin-top: 4px; }
   .tree-preview {
     background: linear-gradient(135deg, #f7f9ff, #eef2fe);
     border: 2px dashed #c9d3f5; border-radius: 12px;
-    padding: 16px 18px; margin-bottom: 16px; min-height: 66px;
+    padding: 16px 18px; margin-bottom: 24px; min-height: 66px;
   }
   .tree-preview .tp-label {
     font-size: 11.5px; font-weight: 700; color: #8a93bb; letter-spacing: .04em;
-    margin-bottom: 7px; text-transform: uppercase;
+    margin-bottom: 7px;
   }
-  .tree-preview .tp-sentence { font-size: 19px; line-height: 1.6; color: #9aa1bb; }
+  /* 整句统一字号 / 行高 / 主色；只用一个淡背景标记「可替换的部分」 */
+  .tree-preview .tp-sentence { font-size: 19px; line-height: 1.7; color: #2b3150; }
   .tree-preview .tp-sentence .slot {
-    display: inline-block; min-width: 54px; padding: 0 8px; margin: 0 2px;
-    border-bottom: 2px solid #b9c3ea; color: #b9c3ea; text-align: center;
-    font-size: 14px; border-radius: 4px 4px 0 0;
+    display: inline-block; padding: 0 7px; margin: 0 2px; border-radius: 6px;
+    font-size: 19px; line-height: 1.7; color: #b9c3ea;
+    border: 1px dashed #c3cbe8; cursor: pointer;
+    transition: background .15s, color .15s;
   }
+  .tree-preview .tp-sentence .slot:hover { background: #e6ebff; }
+  .tree-preview .tp-sentence .slot:focus-visible { outline: 2px solid #4a5ca8; outline-offset: 2px; }
   .tree-preview .tp-sentence .slot.filled {
-    color: #2b3150; font-weight: 700; border-bottom-color: #667eea;
-    background: #e6ebff; animation: slotIn .3s ease;
+    color: #2b3150; background: #e6ebff; border: 1px solid #d5ddf8;
+    animation: slotIn .3s ease;
   }
-  .tree-preview .tp-zh { font-size: 13px; color: #8a93bb; margin-top: 8px; }
+  .tree-preview .tp-sentence .slot.filled:hover { background: #dbe3ff; }
+  .tree-preview .tp-zh { font-size: 13.5px; color: #7b84a3; margin-top: 8px; line-height: 1.6; }
+  .tree-preview .tp-note {
+    margin-top: 10px; padding-top: 9px; border-top: 1px dashed #d5ddf8;
+    font-size: 12.5px; color: #7a6a2f; line-height: 1.6;
+  }
+  .tree-preview .tp-note[hidden] { display: none; }
   @keyframes slotIn {
-    from { transform: translateY(-5px); opacity: .2; } to { transform: none; opacity: 1; }
+    from { transform: translateY(-5px); opacity: .4; } to { transform: none; opacity: 1; }
   }
 
   .tree-step {
-    border: 1px solid #e8ebf4; border-radius: 12px; padding: 13px 15px;
+    border: 1px solid #e8ebf4; border-radius: 12px; padding: 12px 15px;
     margin-bottom: 11px; background: #fff; transition: border-color .2s, background .2s;
   }
   .tree-step.active { border-color: #b9c3ea; background: #fbfcff; box-shadow: 0 1px 8px rgba(102,126,234,.08); }
   .tree-step.done { background: #f7fffd; border-color: #b5e8e8; }
+  /* 头部是按钮：点一下展开/收起这一组（允许回头修改，不强制单向） */
   .tree-step-label {
     display: flex; align-items: center; gap: 8px; font-size: 13.5px;
-    font-weight: 700; color: #3f465c; margin-bottom: 10px;
+    font-weight: 700; color: #3f465c; width: 100%; text-align: left;
+    background: none; border: none; padding: 0; font-family: inherit; cursor: pointer;
   }
+  .tree-step.active .tree-step-label { margin-bottom: 10px; }
+  .tree-step-label:focus-visible { outline: 2px solid #667eea; outline-offset: 3px; border-radius: 6px; }
   .tree-step-label .ts-idx {
     flex: 0 0 auto; width: 21px; height: 21px; border-radius: 50%;
     background: #667eea; color: #fff; font-size: 12px; line-height: 21px;
     text-align: center;
   }
   .tree-step.done .tree-step-label .ts-idx { background: #13c2c2; }
-  .tree-step-label .ts-picked { margin-left: auto; font-size: 12.5px; color: #08979c; font-weight: 600; }
-  .tree-opts { display: flex; flex-wrap: wrap; gap: 8px; }
+  .tree-step-label .ts-name { flex: 0 0 auto; }
+  /* 必选 / 可选：不只用颜色，配文字标签 */
+  .tree-step-label .ts-tag {
+    flex: 0 0 auto; font-size: 10.5px; font-weight: 700; border-radius: 5px;
+    padding: 1px 6px; border: 1px solid;
+  }
+  .tree-step-label .ts-tag.req { color: #a8261f; background: #fff2f0; border-color: #ffd6d2; }
+  .tree-step-label .ts-tag.opt { color: #5a6bc4; background: #eef1fd; border-color: #dde2f8; }
+  .tree-step-label .ts-picked {
+    margin-left: auto; font-size: 12.5px; color: #08979c; font-weight: 600;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 45%;
+  }
+  .tree-opts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .tree-opt {
     background: #fff; border: 2px solid #e8e8e8; border-radius: 999px;
     padding: 7px 15px; font-size: 14px; cursor: pointer; font-family: inherit;
     transition: all .18s; display: inline-flex; align-items: center; gap: 6px;
   }
   .tree-opt:hover { border-color: #667eea; background: #f8f9ff; transform: translateY(-1px); }
+  .tree-opt:focus-visible { outline: 2px solid #667eea; outline-offset: 2px; }
   .tree-opt .to-zh { font-size: 11.5px; color: #9aa0b0; }
   .tree-opt.active {
     background: #667eea; border-color: #667eea; color: #fff; font-weight: 700;
   }
   .tree-opt.active .to-zh { color: rgba(255,255,255,.8); }
+  /* 「不添加」：可选步骤专属，虚线样式与选项区分开 */
+  .tree-opt.tree-skip { border-style: dashed; color: #6b7288; }
+  .tree-opt.tree-skip.active { border-style: solid; background: #6b7288; border-color: #6b7288; color: #fff; }
+  .tree-req-hint {
+    flex: 1 1 100%; font-size: 11.5px; color: #a8adb8; margin-top: 2px;
+  }
   .tree-actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
   .tree-actions button {
-    flex: 1 1 auto; min-width: 130px; border: none; border-radius: 10px;
+    flex: 1 1 auto; min-width: 120px; border: none; border-radius: 10px;
     padding: 12px 18px; font-size: 15px; cursor: pointer; font-family: inherit;
     transition: opacity .2s, background .15s;
   }
   #treeAgain { background: #667eea; color: #fff; font-weight: 700; }
-  #treeAgain:disabled { opacity: .5; cursor: not-allowed; }
+  #treeReset { background: #eef1fd; color: #5a63c8; font-weight: 700; }
   #treeSpeak { background: #f5f5f5; color: #555; }
-  #treeSpeak:disabled { opacity: .5; cursor: not-allowed; }
+  .tree-actions button:disabled { opacity: .5; cursor: not-allowed; }
+  /* 按钮与卡片贴合问题：最后一个按钮组底部留出与卡片边缘一致的呼吸空间 */
+  .tree-actions:last-child { margin-bottom: 2px; }
+
+  @media (max-width: 640px) {
+    .tree-preview .tp-sentence, .tree-preview .tp-sentence .slot { font-size: 17px; }
+    .tree-actions button { flex: 1 1 100%; }
+  }
 
   /* —— 通用弹层（错题本 / 每日路径 / 标签 / 分享 / 完成）—— */
   .overlay {
@@ -870,7 +988,7 @@
   #shareCopy { background: #f0f1f7; color: #5a6178; font-weight: 600; }
 
   /* —— 本轮练完的完成面板 —— */
-  .done-stats { display: flex; gap: 10px; margin: 4px 0 18px; }
+  .done-stats { display: flex; gap: 10px; margin: 4px 0 18px; flex-wrap: wrap; }
   .done-stat {
     flex: 1; text-align: center; background: #f7f9ff; border: 1px solid #e4e9fb;
     border-radius: 12px; padding: 15px 8px;
@@ -884,6 +1002,11 @@
   .done-stat.r2 .ds-num { color: #d46b08; }
   .done-title { font-size: 20px; font-weight: 800; color: #2b3150; text-align: center; margin-bottom: 6px; }
   .done-sub { font-size: 13.5px; color: #8a93bb; text-align: center; margin-bottom: 18px; line-height: 1.7; }
+  /* 今日累计单独一行：与本轮数字分开，明确口径 */
+  .done-today-line {
+    flex: 1 0 100%; text-align: center; font-size: 12.5px; color: #8a93bb;
+    margin-top: 10px; padding-top: 10px; border-top: 1px dashed #e4e9fb;
+  }
 
   /* 完成页：今天学过的句子 */
   .done-sentences {
@@ -1027,7 +1150,7 @@
   <!-- ============ 通用弹层 ============ -->
 
   <!-- 错题本 -->
-  <div class="overlay" id="wrongBook">
+  <div class="overlay" id="wrongBook" role="dialog" aria-modal="true" aria-label="错题本">
     <div class="sheet">
       <header class="sheet-head">
         <div>
@@ -1045,7 +1168,7 @@
   </div>
 
   <!-- 每日 10 分钟路径 -->
-  <div class="overlay" id="dayPath">
+  <div class="overlay" id="dayPath" role="dialog" aria-modal="true" aria-label="每日路径">
     <div class="sheet">
       <header class="sheet-head">
         <div>
@@ -1059,7 +1182,7 @@
   </div>
 
   <!-- 场景标签 -->
-  <div class="overlay" id="tagPicker">
+  <div class="overlay" id="tagPicker" role="dialog" aria-modal="true" aria-label="按场景练">
     <div class="sheet" style="height:auto;max-height:min(560px,calc(100vh - 48px));">
       <header class="sheet-head">
         <div>
@@ -1073,7 +1196,7 @@
   </div>
 
   <!-- 分享卡片 -->
-  <div class="overlay" id="shareBox">
+  <div class="overlay" id="shareBox" role="dialog" aria-modal="true" aria-label="今日成绩分享卡">
     <div class="sheet" style="height:auto;max-height:calc(100vh - 48px);">
       <header class="sheet-head">
         <div>
@@ -1094,7 +1217,7 @@
   </div>
 
   <!-- 本轮练完的完成面板 -->
-  <div class="overlay" id="doneSheet">
+  <div class="overlay" id="doneSheet" role="dialog" aria-modal="true" aria-label="本轮结果">
     <div class="sheet" style="height:auto;max-height:calc(100vh - 48px);">
       <div class="sheet-body" style="padding:26px 24px;">
         <div class="done-title" id="doneTitle">🎉 今日训练完成！</div>
@@ -1111,7 +1234,7 @@
   </div>
 
   <!-- 训练进行中的返回确认（轻量弹窗，不用浏览器原生 alert） -->
-  <div class="overlay" id="navConfirm">
+  <div class="overlay" id="navConfirm" role="dialog" aria-modal="true" aria-label="离开确认">
     <div class="navc-box">
       <div class="navc-ico">✍️</div>
       <div class="navc-title" id="navcTitle">今天的训练还没有完成</div>
@@ -1151,7 +1274,7 @@
       <button class="mode-btn resume" id="resumeChip" hidden></button>
       <button class="mode-btn" data-mode="view">查看表达</button>
       <button class="mode-btn" data-mode="scene">场景表达</button>
-      <button class="mode-btn" data-mode="tree">表达树</button>
+      <button class="mode-btn" data-mode="tree">句子搭建</button>
       <button class="mode-btn" data-mode="choice">选择题</button>
       <button class="mode-btn" data-mode="blank">填空题</button>
       <button class="mode-btn" data-mode="daily">每日路径</button>
@@ -1342,6 +1465,7 @@
           <div class="en" id="sceneText"></div>
           <div class="zh" id="sceneZh"></div>
         </div>
+        <p class="demo-note" id="sceneDemoNote" hidden></p>
       </div>
     </div>
 
@@ -1356,33 +1480,49 @@
         <div class="q-tags" id="dailyTags"></div>
         <div class="hint" id="dailyHint">今日目标 10 题</div>
       </div>
+      <div class="q-hint-row">
+        <button type="button" class="q-hint-btn" id="dailyHintBtn">💡 提示</button>
+        <span class="q-hint-out" id="dailyHintOut" hidden></span>
+      </div>
       <div class="quiz-options" id="dailyOptions"></div>
       <div class="quiz-feedback" id="dailyFeedback"></div>
       <div class="quiz-controls">
         <button id="dailyNext">下一题</button>
+        <button id="dailySkip" class="btn-ghost">跳过</button>
         <button id="dailyOpenPath" style="background:#f5f5f5;color:#666;">路径列表</button>
       </div>
     </div>
 
-    <!-- 表达树模式（分步骤构造句子） -->
+    <!-- 句子搭建模式（内部沿用 tree 标识；分步骤构造句子） -->
     <div id="treeMode" class="quiz-container">
       <div class="page-head" id="phTree" hidden>
         <button class="nav-btn" type="button" data-back><span class="nb-ico">←</span><span>返回</span></button>
-        <div class="ph-title">表达树</div>
+        <div class="ph-title">句子搭建</div>
       </div>
-      <textarea id="treeInput" placeholder="请输入一个核心表达，例如：I want an orange"></textarea>
-      <div class="row"><button id="treeGo">生成表达树</button></div>
+      <p class="tree-intro">从一句简单表达开始，逐步添加信息。</p>
+      <div id="treeInputWrap">
+        <textarea id="treeInput" placeholder="请输入一个核心表达，例如：I want an orange"></textarea>
+        <div class="row"><button id="treeGo">开始搭建</button></div>
+      </div>
+      <!-- 生成成功后，输入区收成「当前表达 + 修改」，保留原输入 -->
+      <div id="treeInputSummary" hidden>
+        <span class="tis-label">当前表达</span>
+        <span class="tis-text" id="treeInputText"></span>
+        <button type="button" class="btn-outline" id="treeEditInput">修改原句</button>
+      </div>
       <div id="treeLoading" class="loading">思考中… 正在把句子拆成可替换的步骤</div>
       <div id="treePanel" hidden>
         <div class="tree-preview">
-          <div class="tp-label">正在构建的句子</div>
+          <div class="tp-label">正在搭建的句子</div>
           <div class="tp-sentence" id="treePreview"></div>
           <div class="tp-zh" id="treeZh"></div>
+          <div class="tp-note" id="treeNote" hidden></div>
         </div>
         <div class="tree-wrap" id="treeSteps"></div>
         <div class="tree-actions">
           <button id="treeSpeak" disabled>🔊 朗读这句</button>
-          <button id="treeAgain" disabled>🔄 再来一个表达</button>
+          <button id="treeReset" disabled>🔄 重新搭配</button>
+          <button id="treeAgain" disabled>✨ 换个表达</button>
         </div>
       </div>
       <div id="treeError"></div>
@@ -1393,12 +1533,17 @@
       <div class="quiz-question">
         <div class="zh-text" id="choiceQuestion">请选择正确的英文表达</div>
         <div class="q-tags" id="choiceTags"></div>
-        <div class="hint">哪一句听起来最自然？</div>
+        <div class="hint" id="choiceHintText">哪一句听起来最自然？</div>
+      </div>
+      <div class="q-hint-row">
+        <button type="button" class="q-hint-btn" id="choiceHintBtn">💡 提示</button>
+        <span class="q-hint-out" id="choiceHintOut" hidden></span>
       </div>
       <div class="quiz-options" id="choiceOptions"></div>
       <div class="quiz-feedback" id="choiceFeedback"></div>
       <div class="quiz-controls">
         <button id="choiceNext">下一题</button>
+        <button id="choiceSkip" class="btn-ghost">跳过</button>
         <button id="choiceCustom" style="background:#f5f5f5;color:#666;">自定义题目</button>
       </div>
     </div>
@@ -1413,10 +1558,15 @@
           <button class="speak" id="blankSpeak" type="button" title="朗读"></button>
         </div>
       </div>
+      <div class="q-hint-row">
+        <button type="button" class="q-hint-btn" id="blankHintBtn">💡 提示</button>
+        <span class="q-hint-out" id="blankHintOut" hidden></span>
+      </div>
       <div class="quiz-options" id="blankOptions"></div>
       <div class="quiz-feedback" id="blankFeedback"></div>
       <div class="quiz-controls">
         <button id="blankNext">下一题</button>
+        <button id="blankSkip" class="btn-ghost">跳过</button>
         <button id="blankCustom" style="background:#f5f5f5;color:#666;">自定义题目</button>
       </div>
     </div>
@@ -1578,26 +1728,48 @@ const DAILY_PROMPT = `你是一位英语出题助手。用户给你一句中文�
 
 只输出 JSON，不要解释。`;
 
-// 表达树模式：把一句话拆成「分步可选」的构造步骤
-const TREE_PROMPT = `你是英语表达教练，负责把一句英文拆成「可替换的构造步骤」，帮学习者一步步搭出完整句子。
+// 句子搭建（内部沿用 tree 标识）：把一个核心表达拆成「分步可选」的构造步骤
+// 关键设计：每一步分「必选 / 可选」。
+//   - base 描出整句骨架，必选位用 {n}，可选位也用 {n}
+//   - steps[n].optional 标记该位能否「不添加」
+//   - 中文（zh）不再是一个带「…」的整句模板，而是分两段：核心中文 + 可选成分的中文片段，
+//     由前端按中文自己的语序拼装 —— 避免出现 {0}、也不把英文片段塞进中文
+const TREE_PROMPT = `你是英语表达教练，负责把一个核心表达拆成「分步搭建」的步骤，帮学习者从一句简单的话开始，逐步添加信息。
 
 用户会给你一个核心表达（中文或英文）。请输出：
-- base：核心句，用 {0}、{1}… 标出每个可替换位置（按步骤顺序编号）
-- zh：核心句中文意思
-- steps：2~3 个步骤，每个步骤是一类可以替换的成分
+- base：英文核心句，用 {0}、{1}… 标出每个可替换位置（按 steps 顺序编号）
+- zh：核心句的中文意思（不带任何占位符，读起来是一句通顺的中文）
+- zhTail：可选成分在中文里的说法模板，用 {0}/{1}… 与 steps 编号对应；若没有可选步骤则给空字符串
+- steps：2~3 个步骤
 
 严格只输出下面这一个 JSON 对象本身，不要用 \`\`\` 包裹：
-{"base":"I want a {0} orange {1}.","zh":"我想吃一个…的橘子…。","steps":[
-  {"name":"选一个形容词","options":[
+{"base":"I want a {0} orange {1}.","zh":"我想要一个橘子。","zhTail":"，{1}","steps":[
+  {"name":"选一个形容词","optional":true,"options":[
     {"text":"juicy","zh":"多汁的"},{"text":"fresh","zh":"新鲜的"},{"text":"sweet","zh":"甜的"}]},
-  {"name":"选一个场景","options":[
+  {"name":"选一个场景","optional":true,"options":[
     {"text":"for breakfast","zh":"当早餐"},{"text":"after dinner","zh":"饭后"},{"text":"right now","zh":"现在"}]}]}
 
 字段规则：
-- base：核心句。用 {0}/{1}… 标出可替换位置，编号必须从 0 开始且与 steps 顺序一一对应（第一个 step 对应 {0}，第二个对应 {1}）。不要出现多余的占位符。
-- steps：2~3 步，每步给定 name（这一步在选什么，中文，如「选一个形容词」）和 options（3~4 个候选）
-- 每个 option：text 是替换进句子的英文片段，zh 是简短中文释义
-- 选项必须能直接填进 base 的对应位置，替换后是自然、能直接开口说的英语
+- base：英文核心句。用 {0}/{1}… 标出可替换位置，编号从 0 开始，与 steps 顺序一一对应（第一个 step 对应 {0}）。不要有多余占位符。
+- zh：核心句的中文意思，必须是**能独立成句的完整中文**，不含任何 {n} 占位符。
+- zhTail：可选成分叠加在核心句之后的中文模板。用 {n} 指向对应 step 选项的中文（选项的 zh 字段）。
+  例：可选成分是「当早餐」时，模板写作 "，{1}"，最终中文 = 核心中文 + "当早餐"。
+  只有在**可选成分是句末附加信息**时才能这样拼；若某可选成分必须插在句子中间，则它的中文
+  无法安全拼装 —— 这种情况下把该 step 的 optional 设为 false（当作必选），不要硬拼。
+- steps：2~3 步。每步：
+  - name：这一步在选什么（中文，如「选一个形容词」）
+  - optional：true 表示这个成分可以「不添加」（地点、时间、同行者等附加信息）；
+              false 表示语法必需、不能跳过（如冠词、介词宾语、主要动词）
+  - options：3~4 个候选
+- 每个 option：text 是替换进 base 的英文片段，zh 是简短中文释义（2~5 字）
+- tip：仅当用户输入的是**不够自然的英文**时给出，用来做温和的优化提示：
+     {"from":"用户原来的写法","to":"更自然的写法","why":"一句话原因（中文，15 字内）"}
+  如果用户输入已经足够自然，或者输入的是中文，就把整个 tip 字段省略或设为 null。
+  注意：不要因为喜欢另一种说法就判错，只挑真正不自然（中式英语 / 搭配不当）的来提示。
+
+要求：
+- 去掉所有可选成分后，base 必须仍然是一句语法完整、能独立成句的英语（核心句要能独立成句）。
+- 选项必须能直接填进 base 的对应位置，替换后是自然、能直接开口说的英语。
 
 只输出 JSON，不要解释。`;
 
@@ -1773,23 +1945,49 @@ async function callDeepSeek(text, isWord) {
 
 // 选择题 API 调用（3 个选项，best/acceptable/wrong 各一，并带上场景标签）
 // 选择题 / 每日路径 / 标签练习共用这一个函数，避免同一结构写三份
+// 数据不合格时抛 QuizDataError（可重试），调用方据此自动重试或提示换题
 async function generateChoiceQuiz(text) {
   const obj = await callDeepSeekAPI(DAILY_PROMPT, text);
-  const options = normalizeOptions(obj.options);
-  if (!obj.question || options.length < 2) {
-    throw new Error("选择题格式错误");
-  }
-  return { question: obj.question, options: options, tags: normalizeTags(obj.tags) };
+  const question = String(obj.question || "").trim();
+  if (!question) throw QuizDataError("题目缺少中文原句");
+  const v = validateOptions(obj.options);
+  if (!v.ok) throw QuizDataError("选项数据不合格：" + v.error);
+  return { question: question, options: v.options, tags: normalizeTags(obj.tags) };
 }
 
 // 填空题 API 调用（3~4 个带等级的选项）
 async function generateBlankQuiz(text) {
   const obj = await callDeepSeekAPI(BLANK_PROMPT, text);
-  const options = normalizeOptions(obj.options);
-  if (!obj.question || !obj.sentence || options.length < 2) {
-    throw new Error("填空题格式错误");
+  const question = String(obj.question || "").trim();
+  const sentence = String(obj.sentence || "").trim();
+  if (!question) throw QuizDataError("题目缺少中文原句");
+  if (!sentence) throw QuizDataError("题目缺少英文句子");
+  if (sentence.indexOf("___") < 0) throw QuizDataError("英文句子里没有空位 ___");
+  if (sentence.split("___").length !== 2) throw QuizDataError("英文句子里的空位不止一个");
+  const v = validateOptions(obj.options);
+  if (!v.ok) throw QuizDataError("选项数据不合格：" + v.error);
+  // 校验选项能填进空位：候选词本身不能再含空位
+  if (v.options.some(o => o.text.indexOf("___") >= 0)) {
+    throw QuizDataError("候选项里含有空位符号");
   }
-  return { question: obj.question, sentence: obj.sentence, zh: obj.zh || "", options: options };
+  return { question: question, sentence: sentence, zh: obj.zh || "", options: v.options };
+}
+
+// 带一次重试的出题包装：模型偶尔会漏标等级 / 给出多个最佳答案。
+// 这类「数据不合格」先自动重试一次（换个采样往往就好了），
+// 仍不合格则把明确原因抛给界面，由界面提示「换一题」——
+// 绝不让用户在一道没有正确答案的题上作答。
+async function generateQuizWithRetry(fn, text, label) {
+  let lastErr = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await fn(text);
+    } catch (e) {
+      lastErr = e;
+      if (!e || !e.isQuizDataError) throw e;   // 网络/接口错误不重试
+    }
+  }
+  throw new Error(label + "生成失败：" + (lastErr ? lastErr.message : "数据异常") + "，请点「换一题」重试。");
 }
 
 // 场景表达 API 调用（一次生成四个场景的表达）
@@ -1834,12 +2032,12 @@ function tagLabel(key) {
 // 出题直接复用 generateChoiceQuiz（同一个 DAILY_PROMPT、同样带 tags），
 // 不再单独放一份几乎相同的函数，改提示词时只有一处要动
 
-// ================= 表达树：把一句话拆成可替换的构造步骤 =================
-// 返回 {base, zh, steps:[{name, options:[{text, zh}]}]}
+// ================= 句子搭建：把一个核心表达拆成可替换的构造步骤 =================
+// 返回 {base, zh, zhTail, steps:[{name, optional, options:[{text, zh}]}]}
 async function generateTree(text) {
   const obj = await callDeepSeekAPI(TREE_PROMPT, "核心表达：" + text);
   const base = String(obj.base || "").trim();
-  if (!base) throw new Error("表达树格式错误");
+  if (!base) throw QuizDataError("核心句为空");
 
   const rawSteps = Array.isArray(obj.steps) ? obj.steps : [];
   const steps = [];
@@ -1850,14 +2048,20 @@ async function generateTree(text) {
       if (!o) return;
       const t = String(o.text || "").trim();
       if (!t) return;
+      // 选项本身不能含占位符（会破坏拼装）
+      if (/\{\d+\}/.test(t)) return;
       opts.push({ text: t, zh: String(o.zh || "").trim() });
     });
     if (!opts.length) return;
     // 只保留 base 里真实存在的占位符，避免出现「点了没反应」的空步骤
     if (base.indexOf("{" + i + "}") < 0) return;
-    steps.push({ name: String(s.name || ("第 " + (i + 1) + " 步")).trim(), options: opts.slice(0, 4) });
+    steps.push({
+      name: String(s.name || ("第 " + (i + 1) + " 步")).trim(),
+      optional: !!s.optional,
+      options: opts.slice(0, 4)
+    });
   });
-  if (!steps.length) throw new Error("表达树没有可替换的步骤，换一句再试试");
+  if (!steps.length) throw QuizDataError("没有可替换的步骤");
 
   // 占位符重编号：按出现顺序对应 {0}/{1}…，多余的直接去掉，
   // 保证 base 里的占位符数量与 steps 一致（避免出现点不到的步骤）
@@ -1866,29 +2070,108 @@ async function generateTree(text) {
     .map(p => (/^\{\d+\}$/.test(p) ? (seq < steps.length ? "{" + (seq++) + "}" : "") : p))
     .join("");
 
-  return { base: newBase, zh: String(obj.zh || "").trim(), steps: steps };
+  const zh = String(obj.zh || "").trim();
+  // 中文占位符也要重编号并校验：只保留与 steps 编号对应的那些
+  let zhTail = String(obj.zhTail || "").trim();
+  if (zhTail) {
+    let bad = false;
+    zhTail = zhTail.replace(/\{(\d+)\}/g, (m, n) => {
+      const i = Number(n);
+      if (i >= steps.length) { bad = true; return ""; }
+      return "{" + i + "}";
+    });
+    if (bad || !steps.some(s => s.optional)) zhTail = "";
+  } else {
+    zhTail = "";
+  }
+
+  // 可选：用户英文不够自然时的温和提示（不强制判错，只提示更自然的说法）
+  let tip = null;
+  const rawTip = obj.tip;
+  if (rawTip && typeof rawTip === "object" &&
+      typeof rawTip.from === "string" && typeof rawTip.to === "string" &&
+      rawTip.from.trim() && rawTip.to.trim() && rawTip.from.trim() !== rawTip.to.trim()) {
+    tip = {
+      from: rawTip.from.trim(),
+      to: rawTip.to.trim(),
+      why: typeof rawTip.why === "string" ? rawTip.why.trim() : ""
+    };
+  }
+
+  return { base: newBase, zh: zh, zhTail: zhTail, steps: steps, tip: tip };
 }
 
 // ================= 语感等级系统（前端判定，AI 不参与）=================
 // 统一数据结构：options = [{text, level}]；level 只允许 best / acceptable / wrong
+// 语义分三层，页面上必须用不同措辞表达，不能混为一谈：
+//   best       更适合当前语境
+//   acceptable 可以使用，只是不如 best 自然（不是语法错误）
+//   wrong      确实有误（语法 / 词汇 / 搭配层面的错）
 const LEVELS = ["best", "acceptable", "wrong"];
 const LEVEL_FB_CLS = { best: "correct-fb", acceptable: "maybe-fb", wrong: "wrong-fb" };
 const LEVEL_BTN_CLS = { best: "correct", acceptable: "maybe", wrong: "wrong" };
 const LEVEL_ICON = { best: "✔", acceptable: "⚠", wrong: "✖" };  // 反馈条图标：绿✔ / 黄⚠ / 红✖
+// 等级 → 中性说明（不预设立场：acceptable 不说成语法错误，wrong 才说「有误」）
+const LEVEL_NOTE = {
+  best: "更适合当前语境",
+  acceptable: "可以使用，但不是本题最佳",
+  wrong: "英语表达有误"
+};
 
-// 规范化选项数据：过滤空项，保证每项有合法 level，且至少一个 best（缺则第一个提升为 best）
+// 规范化选项数据：过滤空项与重复项。
+// 注意：这里不再「缺 best 就把第一个提升为 best」——那会把模型输出的错误
+// 悄悄变成「正确答案」，让用户为模型的问题买单。缺等级时 level 留空，
+// 由 validateOptions 判定这组选项不可用，调用方重试或提示换题。
 function normalizeOptions(raw) {
   const opts = [];
+  const seen = Object.create(null);
   (Array.isArray(raw) ? raw : []).forEach(o => {
-    if (!o) return;
+    if (!o || typeof o !== "object") return;
     const text = String(o.word || o.text || "").trim();
     if (!text) return;
-    const level = LEVELS.indexOf(o.level) >= 0 ? o.level : "acceptable";
-    const meaning = o.meaning || "";
-    opts.push({ text: text, level: level, word: text, meaning: meaning });
+    const key = text.toLowerCase();
+    if (seen[key]) return;                 // 重复选项只保留第一条
+    seen[key] = true;
+    opts.push({
+      text: text,
+      word: text,
+      level: LEVELS.indexOf(o.level) >= 0 ? o.level : "",
+      meaning: o.meaning || "",
+      keyword: o.keyword || ""
+    });
   });
-  if (opts.length && !opts.some(o => o.level === "best")) opts[0].level = "best";
   return opts;
+}
+
+// 校验一组选项能否当题目用。返回 {ok, options, error}
+// 检查项：数量、缺失等级、最佳答案数量（必须恰好 1 个）
+function validateOptions(raw) {
+  const options = normalizeOptions(raw);
+  if (options.length < 2) {
+    return { ok: false, options: options, error: "选项少于 2 个" };
+  }
+  const missing = options.filter(o => !o.level);
+  if (missing.length) {
+    return { ok: false, options: options,
+             error: "有选项没有标注语感等级（" + missing.map(o => o.text).join("、") + "）" };
+  }
+  const bests = options.filter(o => o.level === "best");
+  if (bests.length === 0) {
+    return { ok: false, options: options, error: "没有标出最佳答案" };
+  }
+  if (bests.length > 1) {
+    return { ok: false, options: options,
+             error: "有多个最佳答案（" + bests.map(o => o.text).join("、") + "）" };
+  }
+  return { ok: true, options: options, error: "" };
+}
+
+// 题目数据异常（模型输出不合格）——单独一个错误类型，
+// 加载时据此决定「自动重试一次」或提示用户换题
+function QuizDataError(msg) {
+  const e = new Error(msg || "题目数据异常");
+  e.isQuizDataError = true;
+  return e;
 }
 
 // 前端查等级：找到同文案的选项取其 level；查不到按 acceptable
@@ -1897,13 +2180,16 @@ function getLevel(text, options) {
   return hit && LEVELS.indexOf(hit.level) >= 0 ? hit.level : "acceptable";
 }
 
-// 取最自然的那一项
+// 取最自然的那一项（数据已通过 validateOptions，必定有且仅有一个 best）
 function bestOf(options) {
   const hit = (options || []).find(o => o.level === "best");
   return hit ? hit.text : (((options || [])[0] || {}).text || "");
 }
 
 // 本地兜底反馈文案（秒出；有 Key 时 AI 文案回来只替换文字，等级与配色不变）
+// 措辞必须与等级语义一致：acceptable 不是「错」，只是不如 best 自然；
+// 只有 wrong 才说「不对 / 有误」。不在这里给出具体错误原因 ——
+// 原因要么由 AI 说明，要么留空，绝不随机猜一个标签糊弄用户。
 const FB_LOCAL = {
   best: [
     "不错，就是这个感觉！",
@@ -1949,12 +2235,14 @@ function pickLocalExplain(level, userText, bestText) {
 
 // 渲染反馈条：level 决定图标，msg=点评文案，answer=展示的最佳表达（可省略）
 // cmp={user, correct} 时追加「你的答案 → 正确说法」对比块（答错才有学习价值）
-function renderFeedback(box, level, msg, answer, cmp) {
+// note=本题等级的中性说明（更适合当前语境 / 可以使用 / 有误）
+function renderFeedback(box, level, msg, answer, cmp, note) {
   box.textContent = "";
   const p = document.createElement("div");
   p.className = "fb-msg";
   const ico = document.createElement("span");
   ico.className = "fb-ico";
+  ico.setAttribute("aria-hidden", "true");
   ico.textContent = LEVEL_ICON[level] || "";
   const t = document.createElement("span");
   t.className = "fb-text";
@@ -1962,6 +2250,14 @@ function renderFeedback(box, level, msg, answer, cmp) {
   p.appendChild(ico);
   p.appendChild(t);
   box.appendChild(p);
+  // 等级说明：把「可以使用」和「有误」明确分开，避免用户把 acceptable 当成语法错误
+  const noteText = note !== undefined ? note : LEVEL_NOTE[level];
+  if (noteText) {
+    const n = document.createElement("div");
+    n.className = "fb-level";
+    n.textContent = noteText;
+    box.appendChild(n);
+  }
   if (answer) {
     const a = document.createElement("div");
     a.className = "answer";
@@ -2000,14 +2296,12 @@ function renderExplain(box, text) {
   el.textContent = text;
 }
 
-// 错误原因标签（词汇/语法/语气/搭配）：AI 返回前先用前端猜测兜底，点完立刻有内容
-const REASON_LOCAL = { best: [], acceptable: ["语气", "搭配"], wrong: ["语法", "词汇", "搭配"] };
-function guessReason(level) {
-  const arr = REASON_LOCAL[level] || [];
-  return arr.length ? arr[Math.floor(Math.random() * arr.length)] : "";
-}
+// 错误原因标签（词汇/语法/语气/搭配）：只在有真实依据时显示 ——
+// 「可以使用」说的是搭配/语气上的差别，「有误」才是语法/词汇/搭配上的问题。
+// 前端不再随机猜一个标签冒充原因：AI 有返回就显示，没有就不显示。
+const REASON_PREFIX = { acceptable: "差别 · ", wrong: "错误原因 · " };
 // 渲染 / 更新错误原因标签（text 为空则移除）
-function renderReason(box, text) {
+function renderReason(box, text, level) {
   let el = box.querySelector(".fb-reason");
   if (!text) { if (el) el.remove(); return; }
   if (!el) {
@@ -2018,7 +2312,7 @@ function renderReason(box, text) {
   el.textContent = "";
   const k = document.createElement("span");
   k.className = "rsn";
-  k.textContent = "错误原因 · ";
+  k.textContent = REASON_PREFIX[level] || "说明 · ";
   el.appendChild(k);
   el.appendChild(document.createTextNode(text));
 }
@@ -2072,7 +2366,7 @@ async function upgradeFeedback(box, seq, info) {
     const t = box.querySelector(".fb-text");
     if (t) t.textContent = r.message;
     // 错误原因：只在答错/勉强时补，且不覆盖已有内容
-    if (r.tag && info.level !== "best") renderReason(box, r.tag);
+    if (r.tag && info.level !== "best") renderReason(box, r.tag, info.level);
     // 更自然的表达：答对时补充
     if (r.better && info.level === "best") renderBetter(box, r.better);
   } catch (e) {
@@ -2232,6 +2526,15 @@ function displayStreak() {
   return 0;                               // 断了好几天 → 显示为 0
 }
 
+// —— 本轮统计（与「今日累计」分开，绝不混用同一口径）——
+// answered: 本轮已作答数；bestHit: 本轮答对（best）数
+let roundStats = { answered: 0, bestHit: 0 };
+function resetRoundStats() { roundStats = { answered: 0, bestHit: 0 }; }
+function bumpRoundStats(level) {
+  roundStats.answered++;
+  if (level === "best") roundStats.bestHit++;
+}
+
 // —— 今日学过的句子（完成页 / 分享卡展示）——
 // 只保留当天、去重、最新的若干条地道表达
 let todayLearned = [];   // [{en, zh}]
@@ -2284,22 +2587,26 @@ function updateTopBar() {
   if (homeHero && !homeHero.hidden) refreshHome();
 }
 
-// 开始一轮练习：重置进度与 streak，并清掉上一轮的练习来源
+// 开始一轮练习：重置进度与 streak，并清掉上一轮的练习来源与题目队列
 function startRound(total) {
   progress.currentQuestionIndex = 0;
   progress.totalQuestions = total || DEFAULT_TOTAL;
   progress.streak = 0;
+  progress.roundId = newRoundId();   // 本轮标识：防止上一轮的异步结果串到这一轮
   // maxStreak 是跨轮保留的最好成绩，不重置
   activeWrong = false;
   activeTagPool = null;
-  clearSnapshot();      // 新的一轮开始 → 上一轮没做完的续练点作废
+  roundQueue = [];          // 清空本轮题目队列
+  resetRoundStats();        // 本轮统计归零（与今日累计分开）
+  resetAnsweredKeys();      // 新一轮：作答去重标志清零
+  clearSnapshot();          // 新的一轮开始 → 上一轮没做完的续练点作废
   setTopBarVisible(true);
   updateTopBar();
 }
 
-// 离开未完成的一轮：把「来源 + 题型 + 当前题」存成快照，供首页「继续今日训练」
-// 注意：只存来源与下标，不存 AI 生成的题目内容（localStorage 配额有限，
-// 且回来时按同一来源重新出题即可，不必重新请求 AI）
+// 离开未完成的一轮：把「来源 + 题型 + 当前题内容 + 剩余队列」存成快照，
+// 供首页「继续今日训练」。存当前题内容（而不只是题号）才能回到「同一道题」，
+// 而不是重新生成一道不同的题却声称恢复了现场。
 // 一题都没答（0/N）时不留续练点：这时候没什么可丢的，留了反而让首页
 // 一直显示「继续今日训练」，把一个还没开始的练习说成"练了一半"
 function leaveRound() {
@@ -2311,8 +2618,39 @@ function leaveRound() {
     idx: progress.currentQuestionIndex,
     wrong: !!activeWrong,
     tagPool: activeTagPool ? activeTagPool.slice() : null,
+    // 当前题内容（未作答的那一道）：回来直接原样呈现
+    cur: currentQuestionForSnapshot(),
+    // 「只练错题」剩余队列：保留原题，回轮时继续按队练
+    wrongQueue: activeWrong ? roundQueue.slice(0, 20) : null,
+    // 每日路径剩余题池：跨天已作废，同日续练时按剩余题继续
+    dailyRemaining: currentScreen === "daily" ? dailyInputPool.slice(0, 20) : null,
     date: todayKey()
   });
+}
+// 取当前正在展示的题目（供快照使用）；只保留必要字段，控制体积。
+// 若当前题已经作答过，就不必再存（下一次进来对应的是下一道未答题）。
+function currentQuestionForSnapshot() {
+  const answered = (id) => {
+    const el = document.getElementById(id);
+    return !!(el && el.classList.contains("show"));
+  };
+  if (currentScreen === "choice") {
+    if (!currentChoiceData || answered("choiceFeedback")) return null;
+    return { kind: "choice", question: currentChoiceData.question,
+             options: currentChoiceData.options, tags: currentChoiceData.tags || [] };
+  }
+  if (currentScreen === "blank") {
+    if (!currentBlankData || answered("blankFeedback")) return null;
+    return { kind: "blank", question: currentBlankData.question,
+             sentence: currentBlankData.sentence, zh: currentBlankData.zh || "",
+             options: currentBlankData.options, tags: currentBlankData.tags || [] };
+  }
+  if (currentScreen === "daily") {
+    if (!currentDailyData || answered("dailyFeedback")) return null;
+    return { kind: "choice", question: currentDailyData.question,
+             options: currentDailyData.options, tags: currentDailyData.tags || [] };
+  }
+  return null;
 }
 function setTopBarVisible(on) {
   if (!topBarEl) return;
@@ -2364,6 +2702,7 @@ function recordAnswer(level) {
   stats.totalDone++;
   stats.total++;
   if (correct) { stats.correct++; stats.todayCorrect++; }
+  bumpRoundStats(level);   // 本轮统计（与今日累计分开）
 
   updateTopBar();
 
@@ -2397,13 +2736,23 @@ function addWrong(q) {
   const key = q.question + "|" + (q.mode || "");
   const hit = wrongBook.find(x => (x.question + "|" + (x.mode || "")) === key);
   if (hit) {
+    // 再次答错：更新为最近一次的用户答案 / 最佳答案与相关字段，
+    // 让「错题本」和下次复习都用最新的作答情况，而不是第一次的陈旧记录
     hit.wrongCount = (hit.wrongCount || 1) + 1;
     hit.ts = Date.now();
+    if (q.userAnswer) hit.userAnswer = q.userAnswer;
+    if (q.bestAnswer) hit.bestAnswer = q.bestAnswer;
+    if (q.options && q.options.length) hit.options = q.options;
+    if (q.sentence) hit.sentence = q.sentence;
+    if (q.zh) hit.zh = q.zh;
+    if (q.tags && q.tags.length) hit.tags = q.tags;
+    if (q.hintUsed) hit.hintUsed = true;
   } else {
     wrongBook.unshift({
       question: q.question, options: q.options, sentence: q.sentence || "",
       zh: q.zh || "", mode: q.mode || "choice", tags: q.tags || [],
       userAnswer: q.userAnswer || "", bestAnswer: q.bestAnswer || "",
+      hintUsed: !!q.hintUsed,
       wrongCount: 1, ts: Date.now()
     });
     while (wrongBook.length > 60) wrongBook.pop();   // 上限 60 条，防止无限增长
@@ -2514,7 +2863,8 @@ function shareStats() {
     maxStreak: trainLog.max || 0,   // 历史最长连续打卡天数
     total: stats.totalDone,
     day: todayPlan().day,
-    sentences: todaySentences()     // 今天学过的英文句子
+    sentences: todaySentences(),    // 今天学过的英文句子
+    dateText: todayKey()            // 学习日期（分享卡展示用，真实数据）
   };
 }
 
@@ -2881,8 +3231,10 @@ const wordDemo = {
 async function demoTranslate(text, isWord) {
   await delay(700 + Math.random() * 500);
   if (isWord) {
-    if (wordDemo[text]) return Object.assign({ isDemo: false }, wordDemo[text]);
-    // 词库未收录的单词：占位演示
+    // 内置词条：内容真实，但依然是「演示数据」，必须如实标注 ——
+    // 不能把内置例句当成 AI 现场生成的结果展示给用户
+    if (wordDemo[text]) return Object.assign({ isDemo: true }, wordDemo[text]);
+    // 词库未收录的单词：占位演示（明确说明这是内置示例，不是翻译结果）
     return {
       list: [
         { t: "基础例句", en: "(" + text + ") 的基础例句——接入 API 后自动生成" },
@@ -2892,7 +3244,7 @@ async function demoTranslate(text, isWord) {
       word: text, definition: "（接入 API 后自动生成释义）", isDemo: true
     };
   }
-  if (canned[text]) return Object.assign({ isDemo: false }, canned[text]);
+  if (canned[text]) return Object.assign({ isDemo: true }, canned[text]);
   const n = text.replace(/[。！？，,.!?]/g, " ");
   return {
     list: [
@@ -2905,13 +3257,15 @@ async function demoTranslate(text, isWord) {
 }
 
 // 场景表达演示数据：收在词条里的直接返回，否则给占位提示
+// 返回值带 isDemo 标记，供界面如实说明「这是内置示例」
 async function demoScenes(text) {
   await delay(600 + Math.random() * 400);
-  if (sceneDemo[text]) return sceneDemo[text];
+  if (sceneDemo[text]) return Object.assign({ isDemo: true }, sceneDemo[text]);
   const placeholder = {};
   SCENES.forEach(s => {
     placeholder[s.key] = "(演示模式) 接入 API 后，这里会显示适合「" + s.label + "」的表达";
   });
+  placeholder.isDemo = true;
   return placeholder;
 }
 
@@ -2937,6 +3291,10 @@ async function translate(text, isWord) {
 }
 
 // ================= 朗读（浏览器内置语音合成）=================
+// 「自动朗读」设置的唯一读取口：所有自动触发（生成完成 / 选词 / 作答反馈）
+// 都必须经过这里，确保关掉设置后完全静音；主动点 🔊 不受它限制。
+function cfgAutoSpeak() { return !!CFG.autoSpeak; }
+
 const SPEAK_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" ' +
   'stroke-linecap="round" stroke-linejoin="round">' +
@@ -2955,13 +3313,29 @@ function showToast(msg) {
   el._t = setTimeout(() => el.classList.remove("show"), 8000);
 }
 
+// 是否支持语音合成：所有访问都要先过这一关（不支持就提示，不能报错）
+function speechSupported() {
+  return typeof window !== "undefined" && "speechSynthesis" in window &&
+         typeof SpeechSynthesisUtterance === "function";
+}
+// 当前正在朗读的 utterance：切页 / 重读时用它判断是否需要中断
+let currentUtterance = null;
+// 中断朗读（离开页面 / 切模式时调用，避免旧的朗读突然响起）
+function stopSpeaking() {
+  currentUtterance = null;
+  if (!speechSupported()) return;
+  try { speechSynthesis.cancel(); } catch (e) {}
+}
+
 function speak(text) {
-  if (!("speechSynthesis" in window)) { showToast("当前浏览器不支持语音朗读"); return; }
+  if (!speechSupported()) { showToast("当前浏览器不支持语音朗读，可以改用 Chrome / Edge 打开本页。"); return; }
   const clean = String(text).replace(/_+/g, "…");   // ___ 空位读成停顿，避免被读成 underline
+  if (!clean.trim()) return;
 
   const doSpeak = () => {
     speechSynthesis.cancel();                         // 连点时不叠音
     const u = new SpeechSynthesisUtterance(clean);
+    currentUtterance = u;
     const vs = speechSynthesis.getVoices();
     const en = vs.find(v => /^en-US/i.test(v.lang)) || vs.find(v => /^en/i.test(v.lang));
     const RATE = { slow: .8, normal: .92, fast: 1.12 };  // 语音设置里的三档语速
@@ -2972,35 +3346,61 @@ function speak(text) {
     // 用 watchdog 检测：2.5 秒内没开始、没报错 → 判定引擎无响应，给用户明确指引
     let started = false;
     const watchdog = setTimeout(() => {
-      if (!started) {
+      if (!started && currentUtterance === u) {
         showToast("语音引擎没有响应（Chrome 已知问题）：请完全退出浏览器重开——右键任务栏 Chrome 图标 → 退出，或在任务管理器结束所有 Chrome 进程后再打开本页。");
       }
     }, 2500);
     u.onstart = () => { started = true; clearTimeout(watchdog); };
     u.onerror = e => {
       clearTimeout(watchdog);
-      // 读不出来时给出明确提示，不再静默失败
-      if (e.error !== "interrupted" && e.error !== "canceled") {
-        showToast("没有可用的朗读语音：请在 Windows「设置 → 时间与语言 → 语音」安装「英语(美国)」语音包，再刷新本页。");
+      if (currentUtterance === u) currentUtterance = null;
+      // 提示按浏览器实际能力给出，不再一律让人「去 Windows 装语音包」
+      if (e.error === "not-allowed") {
+        showToast("浏览器拦截了朗读：请先在本页面点一下（有交互后浏览器才允许发声）再试。");
+      } else if (e.error !== "interrupted" && e.error !== "canceled") {
+        showToast(voiceInstallHint());
       }
     };
-    u.onend = () => clearTimeout(watchdog);
+    u.onend = () => { clearTimeout(watchdog); if (currentUtterance === u) currentUtterance = null; };
     speechSynthesis.resume();   // 修复 Chrome 偶发"卡住不出声"的问题
     speechSynthesis.speak(u);
   };
 
   if (speechSynthesis.getVoices().length) { doSpeak(); return; }
-  // 浏览器首次访问时语音列表可能是空的（异步加载），等它就绪后再读
-  const timer = setTimeout(() => {
-    if (!speechSynthesis.getVoices().length) {
-      showToast("没检测到可用的朗读语音：请在 Windows「设置 → 时间与语言 → 语音」安装「英语(美国)」语音包，再刷新本页。");
-    }
+  // 浏览器首次访问时语音列表可能是空的（异步加载），等它就绪后再读。
+  // 用 addEventListener 而非赋值，避免覆盖「刷新语音设置页」的监听器
+  let done = false;
+  const onReady = () => {
+    if (done) return;
+    done = true;
+    speechSynthesis.removeEventListener("voiceschanged", onReady);
+    if (speechSynthesis.getVoices().length) doSpeak();
+    else showToast(voiceInstallHint());
+  };
+  speechSynthesis.addEventListener("voiceschanged", onReady);
+  setTimeout(() => {
+    if (done) return;
+    done = true;
+    speechSynthesis.removeEventListener("voiceschanged", onReady);
+    if (speechSynthesis.getVoices().length) doSpeak();
+    else showToast(voiceInstallHint());
   }, 1500);
-  speechSynthesis.onvoiceschanged = () => { clearTimeout(timer); doSpeak(); };
 }
 
-// 语音列表就绪时，同步刷新「语音设置」页的检测结果
-speechSynthesis.onvoiceschanged = () => { updateVoiceInfo(); };
+// 按平台给出「如何装语音」的指引：Windows 指向语音包设置，其它平台给通用说法
+function voiceInstallHint() {
+  const ua = navigator.userAgent || "";
+  if (/Windows/i.test(ua)) {
+    return "没有可用的英文朗读语音：请在 Windows「设置 → 时间与语言 → 语音」安装「英语(美国)」语音包，再刷新本页。";
+  }
+  return "没有可用的英文朗读语音：请在系统的「语音 / 辅助功能」设置里添加英语语音，或改用 Chrome / Edge 打开本页。";
+}
+
+// 语音列表就绪时，同步刷新「语音设置」页的检测结果。
+// 用 addEventListener 而非赋值，避免与 speak() 里的临时监听器互相覆盖
+if (speechSupported()) {
+  speechSynthesis.addEventListener("voiceschanged", () => { updateVoiceInfo(); });
+}
 
 // ================= 界面逻辑 =================
 const input     = document.getElementById("input");
@@ -3047,8 +3447,8 @@ let suppressAutoload = false;
 function switchMode(mode) {
   // 进入任何具体模式时收起首页主卡片（"home" 是首页态，不属任何模式）
   const isHome = mode === "home";
-  // 真正换层时，先离开的那一页留一份「当时的样子」，供返回时还原
-  if (mode !== currentScreen) snapshotCtx(currentScreen);
+  // 换页时立刻停掉正在进行的朗读：切到别的页面后，上一页的语音不该继续响
+  if (mode !== currentScreen) { stopSpeaking(); snapshotCtx(currentScreen); }
   currentScreen = mode;
   if (homeHero) homeHero.hidden = !isHome;
   if (!isHome) setExploreOpen(false);
@@ -3127,7 +3527,7 @@ const MODE_META = {
   home:   { title: "首页",     page: false, topbar: false },
   view:   { title: "查看表达", page: true,  topbar: false },
   scene:  { title: "场景表达", page: true,  topbar: false },
-  tree:   { title: "表达树",   page: true,  topbar: false },
+  tree:   { title: "句子搭建",   page: true,  topbar: false },
   choice: { title: "选择题",   page: true,  topbar: true  },
   blank:  { title: "填空题",   page: true,  topbar: true  },
   daily:  { title: "每日路径", page: true,  topbar: true  }
@@ -3281,20 +3681,44 @@ function restoreCtx(mode) {
   if (ctx) window.scrollTo(0, ctx.scroll || 0);
 }
 
-// 继续非每日训练：进度已实时落盘，这里只接回练习来源与题型
-// 题型与来源都按快照还原，但题池本身没有落盘 —— 选择题/填空题按来源重新取题，
-// 进度（eng_progress）决定顶栏显示第几题，不会再重复计分
+// 继续非每日训练：进度已实时落盘，这里接回练习来源、题型与「当时那道题」。
+// 优先原样恢复快照里存的那道题（同一道题），恢复不了才退回按来源重新出题。
 function resumeCurrentRound() {
   const snap = resumeSnapshot;
   if (!snap || !MODE_META[snap.mode] || !MODE_META[snap.mode].topbar) return;
-  // 快照里说的题型就在这一层，别再让 switchMode 自动出一题（会闪一下别的题）
   activeWrong = !!snap.wrong;
   activeTagPool = snap.tagPool ? snap.tagPool.slice() : null;
+  // 「只练错题」：接回剩余队列，继续按队练（不重头、不重复）
+  if (activeWrong && Array.isArray(snap.wrongQueue)) {
+    roundQueue = snap.wrongQueue.map(wrongToQuestion);
+  }
   suppressAutoload = true;
   try { switchMode(snap.mode); } finally { suppressAutoload = false; }
-  if (snap.mode === "choice") loadChoiceQuestion();
-  else if (snap.mode === "blank") loadBlankQuestion();
-  else if (snap.mode === "daily") loadDailyQuestion();
+
+  // ① 优先原样恢复当时那道题
+  const cur = snap.cur;
+  if (cur && cur.kind === "blank" && snap.mode === "blank") {
+    loadBlankQuestion(null, Object.assign({ mode: "blank", fromWrong: activeWrong }, cur));
+  } else if (cur && cur.kind === "choice") {
+    if (snap.mode === "choice") {
+      loadChoiceQuestion(null, Object.assign({ mode: "choice", fromWrong: activeWrong }, cur));
+    } else if (snap.mode === "daily") {
+      dailyInputPool.length = 0;
+      (snap.dailyRemaining || []).forEach(s => dailyInputPool.push(s));
+      loadDailyQuestion(Object.assign({}, cur));
+    }
+  } else if (snap.mode === "daily") {
+    // 没有存到具体题（当时刚答完）→ 按剩余题池继续
+    dailyInputPool.length = 0;
+    (snap.dailyRemaining || []).forEach(s => dailyInputPool.push(s));
+    loadDailyQuestion();
+  } else if (activeWrong) {
+    loadNextWrongQuestion();
+  } else if (snap.mode === "choice") {
+    loadChoiceQuestion();
+  } else if (snap.mode === "blank") {
+    loadBlankQuestion();
+  }
   const idx = Math.min(progress.currentQuestionIndex, progress.totalQuestions || DEFAULT_TOTAL);
   showToast(idx > 0 ? "已回到第 " + (idx + 1) + " 题，继续加油 💪" : "继续练习");
 }
@@ -3418,12 +3842,18 @@ heroStartBtn.addEventListener("click", () => {
 
 
 function refreshModeUI() {
-  if (CFG.key) {
-    modeTag.textContent = "AI 已连接";
-    modeTag.className = "tag online";
-  } else {
+  // 顶部标签要如实反映状态，不能「存了 Key 就算已连接」：
+  //   没密钥 → 演示模式；存了但没验证过 → 已配置，待测试；测试通过 → 已验证
+  const st = connState();
+  if (st === "none") {
     modeTag.textContent = "演示模式";
     modeTag.className = "tag demo";
+  } else if (st === "verified") {
+    modeTag.textContent = "AI 已验证";
+    modeTag.className = "tag online";
+  } else {
+    modeTag.textContent = "已配置，待测试";
+    modeTag.className = "tag pending";
   }
   apiKeyEl.value = CFG.key;
   apiUrlEl.value = CFG.baseUrl;
@@ -3444,11 +3874,11 @@ function refreshModeUI() {
 }
 refreshModeUI();
 
-// 切换模型即时生效并自动保存
+// 切换模型即时生效并自动保存（换了模型 → 旧的验证状态作废）
 modelEl.addEventListener("change", () => {
   CFG.model = modelEl.value;
   localStorage.setItem("ds_model", CFG.model);
-  refreshModeUI();
+  invalidateConn();
 });
 
 // ================= 设置弹窗（左侧 Tab 导航） =================
@@ -3503,14 +3933,46 @@ function setConn(kind, title, desc) {
   connTitle.textContent = title;
   connDesc.textContent = desc || "";
 }
+
+// —— 已验证状态的持久化 ——
+// 只有「测试连接成功」才写入；一旦密钥 / 地址 / 模型被改动，立即失效，
+// 所以顶部绝不会凭「有 Key」就显示「已连接」。
+function connSignature() {
+  return [CFG.key, apiUrlEl.value.trim() || CFG.baseUrl, modelEl.value || CFG.model].join("|");
+}
+function connState() {
+  if (!CFG.key) return "none";                                     // 演示模式
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem("ds_conn_ok") || "null"); } catch (e) {}
+  if (saved && saved.sig === connSignature() && saved.ok) return "verified";
+  return "pending";                                                // 已配置，待测试
+}
+function setConnVerified(ok, detail) {
+  if (!ok) { try { localStorage.removeItem("ds_conn_ok"); } catch (e) {} return; }
+  try {
+    localStorage.setItem("ds_conn_ok", JSON.stringify({ sig: connSignature(), ok: true, detail: detail || "" }));
+  } catch (e) {}
+}
+// 改动密钥 / 地址 / 模型 → 旧的验证状态作废
+function invalidateConn() {
+  try { localStorage.removeItem("ds_conn_ok"); } catch (e) {}
+  refreshModeUI();
+}
+
 function refreshConn() {
   if (!CFG.key) {
     setConn("", "未连接 · 演示模式",
       "不填密钥也能先体验：输入句子会展示内置示例。填好下方密钥并保存后，" +
       "即可获得真正的 AI 表达与纠错。");
+    return;
+  }
+  const st = connState();
+  if (st === "verified") {
+    setConn("ok", "已连接并验证通过",
+      "密钥尾号 " + CFG.key.slice(-4) + "，模型「" + CFG.model + "」测试通过，可以开始练习。");
   } else {
-    setConn("ready", "密钥已保存",
-      "密钥尾号 " + CFG.key.slice(-4) + "，只存在这台电脑里。点「测试连接」确认可用后即可开始。");
+    setConn("ready", "已配置，待测试",
+      "密钥尾号 " + CFG.key.slice(-4) + "，只存在这台电脑里。点「测试连接」确认可用后再开始练习。");
   }
 }
 
@@ -3523,6 +3985,9 @@ async function testConnection() {
   const model = modelEl.value || CFG.model;
   testBtn.disabled = true;
   setConn("testing", "正在测试…", "已向 AI 发出一条问候消息，通常几秒内返回。");
+  // 测试前先把输入框里的当前值同步进配置，保证「测的就是要用的那套配置」
+  CFG.key = key; CFG.model = model;
+  if (apiUrlEl.value.trim()) CFG.baseUrl = apiUrlEl.value.trim();
   try {
     let u = (apiUrlEl.value.trim() || "https://api.deepseek.com").replace(/\/+$/, "");
     if (/^https?:\/\/api\.deepseek\.com$/i.test(u) || /\/v1$/i.test(u)) u += "/chat/completions";
@@ -3544,11 +4009,15 @@ async function testConnection() {
       throw new Error(m);
     }
     await res.json();
+    setConnVerified(true, model + "/" + ms + "ms");
     setConn("ok", "连接正常",
       "模型「" + model + "」响应成功（用时 " + ms + " 毫秒），可以开始练习啦。");
+    refreshModeUI();
   } catch (e) {
+    setConnVerified(false);
     setConn("err", "连接失败",
       String(e.message || e) + "。可检查密钥、接口地址与网络后重试。");
+    refreshModeUI();
   }
   testBtn.disabled = false;
 }
@@ -3606,12 +4075,15 @@ rememberModeEl.addEventListener("change", () => {
 });
 const saveKeyBtn = document.getElementById("saveKey");
 function saveKeySettings() {
+  const prevSig = connSignature();
   CFG.key = apiKeyEl.value.trim();
   CFG.baseUrl = apiUrlEl.value.trim() || "https://api.deepseek.com";
   CFG.model = modelEl.value;
   localStorage.setItem("ds_key", CFG.key);
   localStorage.setItem("ds_url", CFG.baseUrl);
   localStorage.setItem("ds_model", CFG.model);
+  // 密钥 / 地址 / 模型任一变化 → 之前的「已验证」不再可信
+  if (connSignature() !== prevSig) setConnVerified(false);
   refreshModeUI();
 }
 saveKeyBtn.addEventListener("click", () => {
@@ -3732,42 +4204,69 @@ function appendCard(label, speakText, mainText, zhText, cls, chipOptions) {
   if (Array.isArray(chipOptions) && chipOptions.length) {
     const wrap = document.createElement("div");
     wrap.className = "chips";
-    const best = bestOf(chipOptions);  // 最贴切的词：标绿用
-    // 点击后的语感反馈条（默认隐藏）
+    const best = bestOf(chipOptions);  // 系统推荐的词
+    // 语感说明条（默认空）：说明「你选的词」和「系统推荐」的关系，不做对错判罚
     const fb = document.createElement("div");
     fb.className = "quiz-feedback";
+    // 空位与选项的映射：一句里若有多个空位，各自独立映射；
+    // 目前数据只支持单空位（prompt 里限定了 1 个 ___），多空位时明确限制，不错配
+    const blankCount = blanks.length;
+    const singleBlank = blankCount === 1;
+    if (blankCount > 1) {
+      const warn = document.createElement("div");
+      warn.className = "chips-note";
+      warn.textContent = "这句话有 " + blankCount + " 个空位，暂不支持逐个替换，先用整句体会语感吧。";
+      div.appendChild(warn);
+    }
+    // 候选词按钮：明确标出「系统推荐」，用户选中另用文字说明
     const chipBtns = [];
     chipOptions.forEach(opt => {
       const w = opt.text;
       const c = document.createElement("button");
       c.className = "chip";
       c.type = "button";
+      const isBest = w === best;
       c.textContent = w;
-      c.title = "点击填入句子";
+      if (isBest) {
+        const b = document.createElement("span");
+        b.className = "chip-reco";
+        b.textContent = "推荐";
+        c.appendChild(b);
+      }
+      c.title = isBest ? "系统推荐：" + w : "点击试试 " + w;
       c.addEventListener("click", () => {
-        // 填空执行器：把选中的词替换进 ___，显示并朗读完整句子
+        if (!singleBlank) return;   // 多空位不支持替换：明确限制，不乱塞
+        // ① 把选中的词真实填进空位并更新英文句
         blanks.forEach(b => { b.textContent = w; b.classList.add("filled"); });
-        curSpeak = String(mainText).split("___").join(w);
-        speak(curSpeak);
-
-        // 更新中文注释：显示填入后的完整句子的中文翻译
         const filledSentence = String(mainText).split("___").join(w);
-        zhEl.textContent = zhText ? zhText + " → " + filledSentence : filledSentence;
+        curSpeak = filledSentence;
 
-        // 语感等级：前端直接从数据里查（best/acceptable/wrong），点击即出，不依赖网络
+        // ② 中文只更新为「这个选项的中文释义」，
+        //    不再用「原中文 → 英文整句」冒充译文
+        const opt2 = chipOptions.find(o => o.text === w) || {};
+        zhEl.textContent = (opt2.meaning ? "填入 " + w + "：" + opt2.meaning : "填入 " + w)
+          + "　（整句：" + filledSentence + "）";
+
+        // ③ 语感等级由前端数据直接判定，点击即出，不依赖网络
         const level = getLevel(w, chipOptions);
         const seq = ++feedbackSeq;
         const bestSentence = String(mainText).split("___").join(best);
-        chipBtns.forEach(el => el.classList.remove("correct", "maybe", "wrong"));
-        c.classList.add(LEVEL_BTN_CLS[level]);
-        chipBtns.forEach(el => {  // 始终标出最贴切的词
-          if (el.textContent === best) el.classList.add("correct");
+        chipBtns.forEach(el => el.classList.remove("correct", "maybe", "wrong", "selected"));
+        // 用户选中的那个词明确标记（不只靠颜色）
+        c.classList.add(LEVEL_BTN_CLS[level], "selected");
+        chipBtns.forEach(el => {
+          // 系统推荐词：始终标出
+          if (el.textContent.replace("推荐", "") === best) el.classList.add("correct");
         });
         fb.className = "quiz-feedback show " + LEVEL_FB_CLS[level];
-        renderFeedback(fb, level, pickLocalFeedback(level, w, best), level === "best" ? null : bestSentence);
+        renderFeedback(fb, level, pickLocalFeedback(level, w, best),
+          level === "best" ? null : bestSentence,
+          null,
+          level === "best" ? "系统也推荐这个词" : "你的选择 / 系统推荐：" + best);
         // AI 只写反馈文案（不改等级/配色）
         upgradeFeedback(fb, seq, { sentence: mainText, word: w, level: level });
-        trackEvent("select_word", { sentence: mainText, word: w, level: level });
+        // 探索操作只做行为埋点，不计入正式答题统计
+        trackEvent("explore_word", { sentence: mainText, word: w, level: level });
       });
       chipBtns.push(c);
       wrap.appendChild(c);
@@ -3897,9 +4396,11 @@ async function run() {
       }
     }
     if (r.isDemo) {
-      demoNote.textContent =
-        "※ 演示模式：该词暂无内置词条，接入 DeepSeek API 后自动生成释义与例句。";
-    } else if (CFG.autoSpeak) {
+      const hasEntry = !!wordDemo[text];
+      demoNote.textContent = hasEntry
+        ? "※ 上面是演示模式的内置词条，不是 AI 现场生成的结果。接入 API 后，任何词都能生成释义与例句。"
+        : "※ 演示模式：该词暂无内置词条，下面是占位说明，接入 DeepSeek API 后自动生成释义与例句。";
+    } else if (cfgAutoSpeak()) {
       // 语音设置里开启「自动朗读」：查词时读单词本身（或释义）
       const w = String(r.word || "");
       const first = r.list && r.list[0] ? r.list[0].en : "";
@@ -3925,10 +4426,13 @@ async function run() {
     appendScene(r.scene);
   }
   if (r.isDemo) {
-    demoNote.textContent =
-      "※ 演示模式：点击上方「⚙ 设置」→「AI 连接」，填入密钥并保存，" +
-      "即可对任意句子生成真正地道、可开口的表达。";
-  } else if (CFG.autoSpeak) {
+    // 内置例句库命中时，上面展示的是内置内容而不是对你输入的翻译 ——
+    // 必须说清楚，避免把用户输入和内置示例摆在一起、造成「已经翻译好了」的错觉
+    const hasEntry = !!canned[text];
+    demoNote.textContent = hasEntry
+      ? "※ 上面是演示模式的内置示例（针对这句常用表达预先写好），不是 AI 现场翻译。接入 API 后，任意句子都能真实生成。"
+      : "※ 演示模式：这句话暂无内置示例，下面是占位说明。接入 API 后即可生成真正地道、可开口的表达。";
+  } else if (cfgAutoSpeak()) {
     // 语音设置里开启「自动朗读」：整句先读「基础表达」
     if (r.list && r.list[0]) speak(r.list[0].en);
   }
@@ -3969,22 +4473,48 @@ document.getElementById("shuffleEx").addEventListener("click", renderExamples);
 // 本轮的练习来源，整轮有效（只练错题 / 按标签练），由 startRound 清零
 let activeWrong = false;
 let activeTagPool = null;
+// 本轮固定的题目队列（只在「只练错题」时使用）：开轮时排好，逐题取出，走完即结束
+let roundQueue = [];
+// 本轮标识：每次 startRound 生成一个新的，异步结果回来时比对，防止串到新一轮
+let roundSeq = 0;
+function newRoundId() { return ++roundSeq + "-" + Date.now().toString(36); }
 
-// 本轮是否已经练完 → 弹出完成面板（返回 true 表示已拦截，不要再出下一题）
+// 本轮是否已经练完。最后一题作答后，用户点「查看本轮结果」进入完成页 ——
+// 不再由代码定时自动弹出（会遮住用户正在读的反馈）。
 function guardRoundDone() {
   if (!isRoundDone()) return false;
   openDone();
   return true;
 }
 
-// 弹层通用开关
-function openOverlay(id) { document.getElementById(id).classList.add("open"); }
-function closeOverlay(id) { document.getElementById(id).classList.remove("open"); }
+// 弹层通用开关。
+// 焦点管理：打开时把焦点移进弹层（首个可聚焦元素），关闭时还给打开它的按钮 ——
+// 键盘用户不会「点开后 Tab 还在背景里乱跑」，关掉后也知道自己回到哪了
+let lastFocusBeforeOverlay = null;
+function openOverlay(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  lastFocusBeforeOverlay = document.activeElement;
+  el.classList.add("open");
+  const first = el.querySelector(
+    "button:not([hidden]):not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex='-1'])");
+  // 同步聚焦：.open 一加上 display 立刻可聚焦，不必等下一帧
+  if (first) { try { first.focus({ preventScroll: true }); } catch (e) { first.focus(); } }
+}
+function closeOverlay(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove("open");
+  if (lastFocusBeforeOverlay && document.contains(lastFocusBeforeOverlay)) {
+    try { lastFocusBeforeOverlay.focus(); } catch (e) {}
+  }
+  lastFocusBeforeOverlay = null;
+}
 document.querySelectorAll("[data-close]").forEach(b => {
   b.addEventListener("click", () => closeOverlay(b.dataset.close));
 });
 document.querySelectorAll(".overlay").forEach(ov => {
-  ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("open"); });
+  ov.addEventListener("click", e => { if (e.target === ov) closeOverlay(ov.id); });
 });
 // Esc：统一关掉「当前最上面那一层」——
 // ① 先看通用弹层（错题本 / 每日路径 / 分享 / 完成 / 返回确认…）
@@ -3993,11 +4523,15 @@ document.querySelectorAll(".overlay").forEach(ov => {
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
   const open = document.querySelectorAll(".overlay.open");
-  if (open.length) { open[open.length - 1].classList.remove("open"); return; }
+  if (open.length) { closeOverlay(open[open.length - 1].id); return; }
   if (settings.classList.contains("open")) closeSettings();
 });
 
-// 本轮练完的完成面板：展示今日题数 / 正确率 / streak，并提供分享与继续
+// 本轮练完的完成面板。
+// 口径说明（六.7）：三个数字分属不同口径，文案必须写清楚，不能混：
+//   · 本轮完成题数 / 本轮最佳表达命中率 —— 只看这一轮
+//   · 今日累计题数                      —— 看今天所有轮次
+//   · 🔥 连续打卡天数                    —— 整站口径
 function openDone() {
   clearSnapshot();   // 本轮完成 → 首页按钮回到「开始今日训练」
   const plan = todayPlan();
@@ -4012,19 +4546,25 @@ function openDone() {
   const s = shareStats();
   if (log.isNew) bumpFlame();   // 打卡天数增加 → 顶部 🔥 跳动
 
+  const rAnswered = roundStats.answered;
+  const rBest = roundStats.bestHit;
+  const rAcc = rAnswered ? Math.round(rBest / rAnswered * 100) : 0;
+
   document.getElementById("doneTitle").textContent =
     isDaily ? "🎉 今日训练完成！" : "🎉 这一轮练完啦";
   document.getElementById("doneSub").textContent = isDaily
     ? "Day " + plan.day + " · " + plan.title + (firstTimeToday
         ? " 已完成，明天继续下一课。"
         : " 又练了一遍，明天继续下一课。")
-    : "做满 " + progress.totalQuestions + " 题了，休息一下，或者再来一轮。";
+    : "本轮做了 " + rAnswered + " 题。休息一下，或者再来一轮。";
+
   const stats_ = document.getElementById("doneStats");
   stats_.innerHTML = "";
   [
-    ["完成题数", s.today + " / " + progress.totalQuestions, ""],
-    ["正确率", s.accuracy + "%", "r1"],
-    ["🔥 连续", s.streak + " 天", "r2"]
+    // 分子分母同口径：本轮完成题数（不是「今日累计 / 本轮总数」）
+    ["本轮完成", rAnswered + " 题", ""],
+    ["本轮最佳表达命中率", rAcc + "%", "r1"],
+    ["🔥 连续打卡", s.streak + " 天", "r2"]
   ].forEach(([lbl, num, cls]) => {
     const d = document.createElement("div");
     d.className = "done-stat " + cls;
@@ -4037,9 +4577,15 @@ function openDone() {
     d.appendChild(n); d.appendChild(l);
     stats_.appendChild(d);
   });
+  // 今日累计单独一行说明，避免与本轮数字混淆
+  const todayLine = document.createElement("div");
+  todayLine.className = "done-today-line";
+  todayLine.textContent = "今日累计 " + s.today + " 题 · 今日最佳表达命中率 " + s.accuracy + "%";
+  stats_.appendChild(todayLine);
+
   renderDoneSentences(s.sentences);
   openOverlay("doneSheet");
-  trackEvent("round_done", { today: s.today, accuracy: s.accuracy, streak: s.streak });
+  trackEvent("round_done", { round: rAnswered, roundAcc: rAcc, today: s.today, accuracy: s.accuracy, streak: s.streak });
 }
 
 // 完成页「今天学过的句子」：展示本轮 2~3 个最佳表达
@@ -4111,12 +4657,22 @@ function renderQuestionTags(box, tags) {
   });
 }
 
-// 统一的下一个题目：优先「只练错题」，其次「按标签练」，最后自由练习（错题优先再次出现）
+// —— 题目级作答状态：每个题面只在第一次作答时计分 ——
+// 鼠标双击 / 键盘 Enter/Space / 触屏重复点击都会落到同一个按钮上，
+// 靠「题目级 answered 标志 + 按钮真实 disabled」两重保险，保证只计一次分。
+function markAnswered(key) {
+  if (answeredKeys[key]) return false;   // 已经答过
+  answeredKeys[key] = true;
+  return true;
+}
+function resetAnsweredKeys() { answeredKeys = Object.create(null); }
+let answeredKeys = Object.create(null);
+
+// 统一的下一个题目。来源优先级：
+//   ① 「只练错题」：由 loadNextWrongQuestion 逐题分派（混合题型各用各的渲染器），不走这里
+//   ② 「按标签练」：从本轮标签题库里随机取
+//   ③ 自由练习：错题优先再次出现，否则随机例句
 function nextQuestionSource() {
-  if (activeWrong) {
-    const rest = wrongBook.slice().sort((a, b) => (b.wrongCount || 1) - (a.wrongCount || 1));
-    if (rest.length) return rest[0];   // 错题本里的题目自带完整选项，直接回放
-  }
   const pool = activeTagPool && activeTagPool.length ? activeTagPool : null;
   const sentence = pool
     ? pool[Math.floor(Math.random() * pool.length)]
@@ -4124,78 +4680,127 @@ function nextQuestionSource() {
   return { question: sentence, tagPool: !!pool };
 }
 
+// 把错题本排成本轮队列：错得多的靠前，但每道题在本轮只出现一次，
+// 走完队列就算练完，不会「答错就立刻再来一遍」。
+function buildWrongQueue() {
+  const queue = wrongBook.slice()
+    .sort((a, b) => (b.wrongCount || 1) - (a.wrongCount || 1) || (b.ts || 0) - (a.ts || 0));
+  return queue.map(wrongToQuestion);
+}
+
+// 「只练错题」的本轮分派器：从队列取下一道，按它自己的 mode 用对应渲染器。
+// 关键点：题型切换只换渲染容器，绝不重置本轮进度（不调用 startRound）。
+async function loadNextWrongQuestion() {
+  if (!activeWrong) return;
+  // 跳过队列里已被答对移除的题（用户可能刚把它清掉）
+  while (roundQueue.length) {
+    const item = roundQueue[0];
+    const stillThere = wrongBook.some(
+      w => w.question === item.question && (w.mode || "choice") === item.mode);
+    if (stillThere) break;
+    roundQueue.shift();
+  }
+  if (!roundQueue.length) {
+    // 队列走完 → 本轮结束，提示进入结果页（不静默回退到普通随机题）
+    progress.currentQuestionIndex = progress.totalQuestions;
+    updateTopBar();
+    openDone();
+    return;
+  }
+  const item = roundQueue.shift();
+  const targetMode = item.mode === "blank" ? "blank" : "choice";
+  if (currentScreen !== targetMode) {
+    suppressAutoload = true;
+    try { switchMode(targetMode); } finally { suppressAutoload = false; }
+  }
+  if (targetMode === "blank") loadBlankQuestion(null, item);
+  else loadChoiceQuestion(null, item);
+}
+
 // 统一的题目来源：whole-round 的「只练错题 / 按标签练」优先，
 // 否则自由练习；customText 为用户自定义（需联网）
-async function loadChoiceQuestion(customText) {
+// directItem：由「只练错题」分派器直接指定的一道错题（跳过出题逻辑）
+async function loadChoiceQuestion(customText, directItem) {
   const choiceQuestion = document.getElementById("choiceQuestion");
   const choiceOptions = document.getElementById("choiceOptions");
   const choiceFeedback = document.getElementById("choiceFeedback");
   const choiceTagBox = document.getElementById("choiceTags");
+  // 记录本次请求所属的轮次：异步返回时若已换轮/换题，就丢弃结果，避免旧内容盖住新题
+  const reqRound = progress.roundId;
 
   choiceOptions.innerHTML = "";
   choiceFeedback.classList.remove("show");
   choiceFeedback.textContent = "";
   if (choiceTagBox) choiceTagBox.innerHTML = "";
+  resetHintUI("choice");
+  currentChoiceData = null;
 
   try {
     let data;
-    const src = customText ? null : nextQuestionSource();
-    if (src && src.options) {
+    if (directItem) {
       // 错题回放：题目就存在错题本里，不必再请求 AI
-      data = src;
+      data = directItem;
       data.fromWrong = true;
-      choiceQuestion.textContent = "生成中...";
+      data.mode = "choice";
     } else if (customText) {
       if (!CFG.key) {
-        alert("演示模式不支持自定义题目，请填入 DeepSeek API Key");
+        alert("自定义题目需要 AI 出题。请先到「⚙ 设置 → AI 连接」填入并保存 API Key。");
         return;
       }
       choiceQuestion.textContent = "生成中...";
-      data = await generateChoiceQuiz(customText);
+      data = await generateQuizWithRetry(generateChoiceQuiz, customText, "选择题");
     } else {
+      const src = nextQuestionSource();
       const sentence = src.question;
       if (CFG.key) {
         choiceQuestion.textContent = "生成中...";
-        data = await generateChoiceQuiz(sentence);
+        data = await generateQuizWithRetry(generateChoiceQuiz, sentence, "选择题");
       } else {
         // 演示模式：优先找演示题库里的对应题，找不到就循环内置选择题
         const demoHit = choiceDemo.find(d => d.question === sentence);
-        data = demoHit || choiceDemo[currentChoiceIndex % choiceDemo.length];
+        const d = demoHit || choiceDemo[currentChoiceIndex % choiceDemo.length];
+        data = { question: d.question, options: normalizeOptions(d.options), tags: [] };
       }
     }
 
+    if (progress.roundId !== reqRound) return;   // 本轮已作废（换轮/退出），丢弃过期结果
     currentChoiceData = data;
-    // 中文题目添加悬停显示英文（取最佳答案）
-    const bestAnswer = bestOf(data.options);
-    choiceQuestion.innerHTML = "";
-    const span = document.createElement("span");
-    span.className = "hover-translation";
-    span.textContent = data.question;
-    span.setAttribute("data-translation", bestAnswer);
-    choiceQuestion.appendChild(span);
+    choiceQuestion.textContent = data.question;
     renderQuestionTags(choiceTagBox, data.tags);
 
     // 打乱选项顺序（3 句表达，best / acceptable / wrong 各一，等级藏在数据里）
     const shuffled = shuffle(data.options);
 
-    // 渲染选项
+    // 渲染选项。选项下方只保留「关键词词义」的悬停说明 ——
+    // 它解释的是词义，不泄露哪一句才是最佳答案
     shuffled.forEach(option => {
       const btn = document.createElement("button");
-      btn.className = "quiz-option hover-translation";
+      btn.className = "quiz-option";
+      btn.type = "button";
       btn.textContent = option.text;
-      // 选项悬停显示关键词的中文释义
-      const translation = option.keyword && option.meaning
-        ? `${option.keyword} - ${option.meaning}`
-        : data.question;
-      btn.setAttribute("data-translation", translation);
+      if (option.keyword && option.meaning) {
+        btn.classList.add("hover-translation");
+        btn.setAttribute("data-translation", option.keyword + " - " + option.meaning);
+      }
       btn.addEventListener("click", () => checkChoiceAnswer(option.text, btn));
       choiceOptions.appendChild(btn);
     });
 
     currentChoiceIndex++;
+    syncQuizControls("choice", false);
   } catch (err) {
-    choiceQuestion.textContent = "生成失败：" + err.message;
+    if (progress.roundId !== reqRound) return;
+    renderChoiceError(err);
   }
+}
+
+// 出题失败的统一呈现：题目区给出原因，主按钮变成「重试」，作答区清空 ——
+// 不让用户在一道没有正确答案的题上作答
+function renderChoiceError(err) {
+  const box = document.getElementById("choiceQuestion");
+  box.textContent = "这道题没能出好：" + (err && err.message ? err.message : String(err));
+  document.getElementById("choiceOptions").innerHTML = "";
+  syncQuizControls("choice", true);
 }
 
 function checkChoiceAnswer(selected, btn) {
@@ -4203,10 +4808,13 @@ function checkChoiceAnswer(selected, btn) {
   const choiceFeedback = document.getElementById("choiceFeedback");
   const allOptions = choiceOptions.querySelectorAll(".quiz-option");
   const data = currentChoiceData;
+  if (!data) return;
+  // 题目级防重复：同一个题面只算一次分
+  if (!markAnswered("choice|" + data.question)) return;
   const options = data.options;
 
-  // 禁用所有选项
-  allOptions.forEach(opt => opt.classList.add("disabled"));
+  // 禁用所有选项（真实 disabled，键盘/触屏也点不动）
+  allOptions.forEach(opt => { opt.classList.add("disabled"); opt.disabled = true; });
 
   // 语感等级：前端直接从数据里查，点击即出（AI 不参与判断）
   const level = getLevel(selected, options);
@@ -4230,18 +4838,107 @@ function checkChoiceAnswer(selected, btn) {
     renderExplain(choiceFeedback, pickLocalExplain(level, selected, best));
     upgradeExplain(choiceFeedback, seq, { best: best, wrong: selected });
   }
+  syncQuizControls("choice", false);
 }
 
 document.getElementById("choiceNext").addEventListener("click", () => {
   if (guardRoundDone()) return;
+  if (activeWrong) { loadNextWrongQuestion(); return; }
   loadChoiceQuestion();   // 本轮来源（只练错题 / 按标签）在 startRound 里设定，全程有效
 });
+// 跳过：不算答对、不计分，直接换下一题（与「下一题」区分开，让用户随时能脱身）
+document.getElementById("choiceSkip").addEventListener("click", () => {
+  if (guardRoundDone()) return;
+  trackEvent("skip", { mode: "choice", index: progress.currentQuestionIndex });
+  if (activeWrong) { loadNextWrongQuestion(); return; }
+  loadChoiceQuestion();
+});
 document.getElementById("choiceCustom").addEventListener("click", () => {
+  if (!CFG.key) {
+    alert("自定义题目需要 AI 出题。请先到「⚙ 设置 → AI 连接」填入并保存 API Key。");
+    return;
+  }
   const text = prompt("请输入一句中文（例如：我想去看电影）");
   if (text && text.trim()) {
     loadChoiceQuestion(text.trim());
   }
 });
+// 提示按钮：给语境与关键词含义，不指出哪一句是答案
+document.getElementById("choiceHintBtn").addEventListener("click", () => {
+  const data = currentChoiceData;
+  if (!data) return;
+  hintUsed["choice|" + data.question] = true;
+  renderHint(document.getElementById("choiceHintOut"),
+             document.getElementById("choiceHintBtn"), buildChoiceHint(data));
+  trackEvent("hint", { mode: "choice", question: data.question });
+});
+
+// ===== 提示入口 / 下一步按钮的统一管理 =====
+// 提示只解释「词义 / 语境」，绝不指出哪一个是答案。用户主动看了提示就记录一下，
+// 复习时能看出这题是靠提示做出来的（但「看提示」本身不当作答对）。
+function renderHint(box, btn, text) {
+  box.textContent = text;
+  box.hidden = false;
+  btn.setAttribute("aria-pressed", "true");
+  btn.disabled = true;   // 提示给一次就够，避免反复点
+}
+function resetHintUI(mode) {
+  const out = document.getElementById(mode + "HintOut");
+  const btn = document.getElementById(mode + "HintBtn");
+  if (out) { out.hidden = true; out.textContent = ""; }
+  if (btn) { btn.disabled = false; btn.setAttribute("aria-pressed", "false"); }
+}
+// 记录「这道题看过提示」（key = mode|题面），用于错题本标注与统计。
+// 键里带题面，所以换题后自然不冲突，不必额外清理。
+let hintUsed = Object.create(null);
+
+// 组装提示文案：优先中文提示 + 所有候选词的含义（不揭示答案）
+function buildBlankHint(data) {
+  const parts = [];
+  if (data.zh) parts.push(data.zh);
+  const meanings = (data.options || [])
+    .filter(o => o.meaning)
+    .map(o => o.word + "：" + o.meaning);
+  if (meanings.length) parts.push("候选词含义 —— " + meanings.join("；"));
+  return parts.length ? parts.join("　") : "这道题没有额外提示，凭语感选一个吧。";
+}
+function buildChoiceHint(data) {
+  const parts = [];
+  const tags = (data.tags || []).map(t => TAG_CN[t] || t);
+  if (tags.length) parts.push("语境：" + tags.join(" / "));
+  const kw = (data.options || [])
+    .filter(o => o.keyword && o.meaning)
+    .map(o => o.keyword + "：" + o.meaning);
+  if (kw.length) parts.push("关键词含义 —— " + kw.join("；"));
+  return parts.length ? parts.join("　") : "这句话看语境，注意搭配和语气是否自然。";
+}
+
+// 作答后统一调整底部按钮。规则（对应四.5）：
+//   · 未作答：主按钮禁用 —— 必须先作答，想跳过请用独立的「跳过」（不计分）
+//   · 已作答且还有题：主按钮「下一题」
+//   · 已作答且是最后一题：主按钮改成「查看本轮结果」，由用户读完解释自己进完成页
+//   · 题目没出好（failed）：主按钮变「重试」，跳过停用
+function syncQuizControls(mode, failed) {
+  const next = document.getElementById(mode + "Next");
+  const skip = document.getElementById(mode + "Skip");
+  const hintBtn = document.getElementById(mode + "HintBtn");
+  const fbEl = document.getElementById(mode + "Feedback");
+  const answered = !!(fbEl && fbEl.classList.contains("show"));
+
+  if (failed) {
+    if (next) { next.disabled = false; next.textContent = "重试"; }
+    if (skip) skip.disabled = true;
+    if (hintBtn) hintBtn.disabled = true;
+    return;
+  }
+  const isLast = progress.currentQuestionIndex >= progress.totalQuestions - 1;
+  if (next) {
+    next.disabled = !answered;
+    next.textContent = isLast ? "查看本轮结果" : "下一题";
+  }
+  if (skip) skip.disabled = answered;      // 答过了就不该再跳
+  if (hintBtn) hintBtn.disabled = answered; // 答过了也不用看提示
+}
 
 // 错题答对后从错题本移除（保持错题本只留真正没掌握的）
 function removeWrongByQuestion(question, mode) {
@@ -4253,8 +4950,8 @@ function removeWrongByQuestion(question, mode) {
   }
 }
 
-// 作答后的统一收尾：streak 变化提示 + 本轮完成提示
-// rec 来自 recordAnswer()，返回 {streak, broke, maxStreak, prev}
+// 作答后的统一收尾：连对中断提示 + 按钮状态。
+// 注意：不再自动弹出完成面板 —— 最后一题要让用户读完解释、自己点「查看本轮结果」。
 function afterAnswer(level, rec, fbBox) {
   if (rec.broke) {
     // 连对中断要有明确反馈（这里说的是「连续答对」，与顶部🔥打卡天数不是一回事）
@@ -4264,12 +4961,10 @@ function afterAnswer(level, rec, fbBox) {
     note.textContent = "连对中断了（之前连续答对 " + rec.prev + " 题，重新开始）";
     (fbBox || document.getElementById("choiceFeedback")).appendChild(note);
   }
-  // 每逢整轮完成，延迟一点弹完成面板（先让用户看完本题反馈）
-  if (isRoundDone()) setTimeout(() => { if (isRoundDone()) openDone(); }, 1400);
 }
 
-// 选择题 / 填空题 / 每日题共用的作答渲染，避免三处各写一遍（本次新增的对比句/reason/streak 只在这里维护）
-// cur: {level, selected, best, fbBox, data, mode, showAnswer, cmpUser, cmpCorrect}
+// 选择题 / 填空题 / 每日题共用的作答渲染，避免三处各写一遍
+// cur: {level, selected, best, fbBox, data, mode, showAnswer, cmpUser, cmpCorrect, autoSpeakText}
 function cfm(cur) {
   const level = cur.level, selected = cur.selected, best = cur.best;
   const fb = cur.fbBox;
@@ -4281,8 +4976,9 @@ function cfm(cur) {
     level === "best" ? (cur.showAnswer || null) : best,
     (level === "best" || !cur.data) ? null : { user: cur.cmpUser || selected, correct: cur.cmpCorrect || best }
   );
-  if (level !== "best") renderReason(fb, guessReason(level));
-  speak(level === "best" && cur.showAnswer ? cur.showAnswer : best);
+  // 错误原因不做本地随机猜测：等 AI 返回；没返回就只显示等级说明。
+  // 朗读属于「作答反馈」这一自动触发，遵守「自动朗读」设置。
+  if (cfgAutoSpeak()) speak(cur.autoSpeakText || (cur.cmpCorrect || best));
 
   if (cur.data) {
     // AI 只写反馈文案（等级/配色由前端判定）
@@ -4290,19 +4986,20 @@ function cfm(cur) {
       sentence: best, word: selected, level: level,
       correct: cur.cmpCorrect || best
     });
-    trackEvent("select_word", { sentence: cur.data.question, word: selected, level: level });
+    trackEvent("answer", { sentence: cur.data.question, word: selected, level: level });
   }
 
   // 记进度 / streak；答错收进错题本
   const rec = recordAnswer(level);
   if (cur.data) {
-    // 今天学过的句子：本题的最佳表达（完成页/分享卡展示）
-    rememberLearned(cur.data.question, best);
+    // 今天学过的句子：本题的完整最佳表达（完成页/分享卡展示）
+    rememberLearned(cur.data.question, cur.learnedSentence || best);
     if (level !== "best") {
       addWrong({
         question: cur.data.question, options: cur.data.options, mode: cur.mode,
         sentence: cur.data.sentence || "", zh: cur.data.zh || "",
-        tags: cur.data.tags || [], userAnswer: selected, bestAnswer: best
+        tags: cur.data.tags || [], userAnswer: selected, bestAnswer: best,
+        hintUsed: !!hintUsed[cur.mode + "|" + cur.data.question]
       });
     } else if (cur.data.fromWrong) {
       removeWrongByQuestion(cur.data.question, cur.mode);
@@ -4316,62 +5013,59 @@ function cfm(cur) {
 let currentBlankIndex = 0;
 let currentBlankData = null;
 
-async function loadBlankQuestion(customText) {
+async function loadBlankQuestion(customText, directItem) {
   const blankQuestion = document.getElementById("blankQuestion");
   const blankSentence = document.getElementById("blankSentence");
   const blankOptions = document.getElementById("blankOptions");
   const blankFeedback = document.getElementById("blankFeedback");
   const blankTagBox = document.getElementById("blankTags");
+  const reqRound = progress.roundId;
 
   blankOptions.innerHTML = "";
   blankFeedback.classList.remove("show");
   blankFeedback.textContent = "";
   if (blankTagBox) blankTagBox.innerHTML = "";
+  resetHintUI("blank");
   currentBlankData = null;  // 加载期间朗读按钮不读旧题
 
   try {
     let data;
-    const src = customText ? null : nextQuestionSource();
-    if (src && src.options && src.mode === "blank") {
+    if (directItem) {
       // 错题回放（填空题错题）：题目存在错题本里，不发请求
-      data = src;
+      data = directItem;
       data.fromWrong = true;
-      blankQuestion.textContent = "生成中...";
-      blankSentence.textContent = "";
+      data.mode = "blank";
     } else if (customText) {
       // 自定义题目
       if (!CFG.key) {
-        alert("演示模式不支持自定义题目，请填入 DeepSeek API Key");
+        alert("自定义题目需要 AI 出题。请先到「⚙ 设置 → AI 连接」填入并保存 API Key。");
         return;
       }
       blankQuestion.textContent = "生成中...";
       blankSentence.textContent = "";  // 清掉占位示例句，避免误认成正在生成的题目
-      data = await generateBlankQuiz(customText);
+      data = await generateQuizWithRetry(generateBlankQuiz, customText, "填空题");
     } else {
       // 用本轮的题目来源（按标签练 / 自由练习，自由练习时错题优先再次出现）
-      const sentence = (src && src.question) || pickPracticeText().text;
+      const sentence = pickPracticeText().text;
       if (CFG.key) {
         blankQuestion.textContent = "生成中...";
         blankSentence.textContent = "";  // 清掉上一题的句子，等待新题时不留旧内容
-        data = await generateBlankQuiz(sentence);
+        data = await generateQuizWithRetry(generateBlankQuiz, sentence, "填空题");
       } else {
         const demoHit = blankDemo.find(d => d.question === sentence);
-        data = demoHit || blankDemo[currentBlankIndex % blankDemo.length];
+        const d = demoHit || blankDemo[currentBlankIndex % blankDemo.length];
+        data = { question: d.question, sentence: d.sentence, zh: d.zh || "",
+                 options: normalizeOptions(d.options), tags: [] };
       }
     }
 
+    if (progress.roundId !== reqRound) return;
     currentBlankData = data;
-    // 中文题目添加悬停显示英文完整句
-    const bestAnswer = data.sentence.split("___").join(bestOf(data.options));
-    blankQuestion.innerHTML = "";
-    const span = document.createElement("span");
-    span.className = "hover-translation";
-    span.textContent = data.question + (data.zh ? " " + data.zh : "");
-    span.setAttribute("data-translation", bestAnswer);
-    blankQuestion.appendChild(span);
+    // 题目只显示中文原句（+ 可选中文提示）；悬停不再挂英文答案，避免泄露
+    blankQuestion.textContent = data.question + (data.zh ? "　" + data.zh : "");
     renderQuestionTags(blankTagBox, data.tags);
 
-    // 英文句子添加悬停显示中文
+    // 英文句子：悬停看中文题意（不泄露该填哪个词）
     blankSentence.innerHTML = "";
     const sentenceSpan = document.createElement("span");
     sentenceSpan.className = "hover-translation";
@@ -4382,61 +5076,99 @@ async function loadBlankQuestion(customText) {
     // 打乱选项顺序（3~4 个候选词，等级藏在数据里）
     const shuffled = shuffle(data.options);
 
-    // 渲染选项
+    // 渲染选项：悬停显示该词的中文释义（解释词义，不揭示答案）
     shuffled.forEach(option => {
       const btn = document.createElement("button");
-      btn.className = "quiz-option hover-translation";
+      btn.className = "quiz-option";
+      btn.type = "button";
       btn.textContent = option.word;
-      // 选项悬停显示该词的中文释义
-      const meaning = option.meaning || option.word;
-      btn.setAttribute("data-translation", meaning);
+      if (option.meaning) {
+        btn.classList.add("hover-translation");
+        btn.setAttribute("data-translation", option.word + " - " + option.meaning);
+      }
       btn.addEventListener("click", () => checkBlankAnswer(option.word, btn));
       blankOptions.appendChild(btn);
     });
 
     currentBlankIndex++;
+    syncQuizControls("blank", false);
   } catch (err) {
-    blankQuestion.textContent = "生成失败：" + err.message;
+    blankQuestion.textContent = "这道题没能出好：" + (err && err.message ? err.message : String(err));
+    blankSentence.textContent = "";
+    blankOptions.innerHTML = "";
+    syncQuizControls("blank", true);
   }
 }
 
+// 作答后在原句空位里真实显示用户填的词；答错再补一行「正确整句」。
+// 三个概念分开维护，不再复用一个 best 字段：
+//   selectedSentence  用户完整句（作答后显示在题面里）
+//   bestSentence      推荐完整句（朗读 / 今日学过 / 错题本）
 function checkBlankAnswer(selected, btn) {
   const blankOptions = document.getElementById("blankOptions");
   const blankFeedback = document.getElementById("blankFeedback");
+  const blankSentenceEl = document.getElementById("blankSentence");
   const allOptions = blankOptions.querySelectorAll(".quiz-option");
   const data = currentBlankData;
+  if (!data) return;
+  if (!markAnswered("blank|" + data.question)) return;
 
-  // 禁用所有选项
-  allOptions.forEach(opt => opt.classList.add("disabled"));
+  // 禁用所有选项（真实 disabled）
+  allOptions.forEach(opt => { opt.classList.add("disabled"); opt.disabled = true; });
 
-  // 语感等级：前端直接从数据里查，点击即出（AI 不参与判断）
   const level = getLevel(selected, data.options);
   const best = bestOf(data.options);
-  // 填入结果（最佳=用户选的词，否则=应填的词）
-  const filledSentence = data.sentence.split("___").join(selected);
+  const selectedSentence = data.sentence.split("___").join(selected);
   const bestSentence = data.sentence.split("___").join(best);
 
   btn.classList.add(LEVEL_BTN_CLS[level]);
   if (level !== "best") {
-    // 高亮最自然的那一项
     allOptions.forEach(opt => {
       if (opt.textContent === best) opt.classList.add("correct");
     });
   }
-  // 答错时对比「你填的整句」与「正确整句」，比只对比单个词更有学习价值
+
+  // 题面更新：空位真的被用户选的词填上（答错也保留用户填法，便于对照）
+  blankSentenceEl.innerHTML = "";
+  const fillSpan = document.createElement("span");
+  fillSpan.className = "blank-filled " + (level === "best" ? "ok" : "bad");
+  fillSpan.textContent = selectedSentence;
+  blankSentenceEl.appendChild(fillSpan);
+  // 答错时在题面下方直接给出正确完整句，不必只靠底部反馈条
+  if (level !== "best") {
+    const rightLine = document.createElement("div");
+    rightLine.className = "blank-right";
+    rightLine.textContent = "✅ 正确整句：" + bestSentence;
+    blankSentenceEl.appendChild(rightLine);
+  }
+
   cfm({
     level: level, selected: selected, best: best, fbBox: blankFeedback,
     data: data, mode: "blank",
-    showAnswer: filledSentence,
-    cmpUser: filledSentence, cmpCorrect: bestSentence
+    // 朗读读完整正确句；今日学过也存完整正确句
+    autoSpeakText: bestSentence,
+    learnedSentence: bestSentence,
+    cmpUser: selectedSentence, cmpCorrect: bestSentence
   });
+  syncQuizControls("blank", false);
 }
 
 document.getElementById("blankNext").addEventListener("click", () => {
   if (guardRoundDone()) return;
+  if (activeWrong) { loadNextWrongQuestion(); return; }
+  loadBlankQuestion();
+});
+document.getElementById("blankSkip").addEventListener("click", () => {
+  if (guardRoundDone()) return;
+  trackEvent("skip", { mode: "blank", index: progress.currentQuestionIndex });
+  if (activeWrong) { loadNextWrongQuestion(); return; }
   loadBlankQuestion();
 });
 document.getElementById("blankCustom").addEventListener("click", () => {
+  if (!CFG.key) {
+    alert("自定义题目需要 AI 出题。请先到「⚙ 设置 → AI 连接」填入并保存 API Key。");
+    return;
+  }
   const text = prompt("请输入一句中文（例如：我想去看电影）");
   if (text && text.trim()) {
     loadBlankQuestion(text.trim());
@@ -4456,6 +5188,16 @@ blankSpeakBtn.addEventListener("click", () => {
   speak(text);
 });
 
+// 提示按钮：只给词义 / 语境，不指出答案；看过提示要记下来
+document.getElementById("blankHintBtn").addEventListener("click", () => {
+  const data = currentBlankData;
+  if (!data) return;
+  hintUsed["blank|" + data.question] = true;
+  renderHint(document.getElementById("blankHintOut"),
+             document.getElementById("blankHintBtn"), buildBlankHint(data));
+  trackEvent("hint", { mode: "blank", question: data.question });
+});
+
 // ================= 场景表达模式（阶段2）=================
 // 一次生成四种场景的表达；Tab 切换只换显示（无刷新、不发请求）
 const sceneInputEl = document.getElementById("sceneInput");
@@ -4471,13 +5213,16 @@ const SCENE_LOADING_TEXT = sceneLoadingEl.textContent;
 let currentSceneData = null;   // {chat, social_post, formal, dating}
 let currentSceneKey = "chat";  // 当前显示的场景
 let sceneSourceText = "";      // 生成这次表达的中文原句
+let sceneSeq = 0;              // 请求标识：快速重复生成时，只认最后一次
 
 function renderScenePanel() {
   const data = currentSceneData || {};
   const label = (SCENES.find(s => s.key === currentSceneKey) || {}).label || "";
+  // 场景标签、英文、中文、朗读对象都取同一个 key → 三者永远对应当前场景
   sceneTagEl.textContent = label;
   sceneTextEl.textContent = data[currentSceneKey] || "";
   sceneZhEl.textContent = sceneSourceText ? "—— " + sceneSourceText : "";
+  document.getElementById("sceneSpeak").disabled = !data[currentSceneKey];
 }
 
 // 切换场景 Tab：只换显示，不重新请求
@@ -4490,28 +5235,41 @@ function setSceneTab(key) {
   renderScenePanel();
 }
 
+const sceneDemoNote = document.getElementById("sceneDemoNote");
+
 async function runScene() {
   const text = sceneInputEl.value.trim();
   if (!text) {
     sceneInputEl.focus();
     return;
   }
+  const my = ++sceneSeq;              // 本次请求标识
   sceneGoBtn.disabled = true;
   sceneLoadingEl.textContent = SCENE_LOADING_TEXT;
   sceneLoadingEl.classList.add("show");
   scenePanelEl.hidden = true;
+  if (sceneDemoNote) sceneDemoNote.hidden = true;
   try {
     const data = CFG.key ? await generateScenes(text) : await demoScenes(text);
+    if (my !== sceneSeq) return;      // 已经又点了一次生成 → 丢弃这次结果
     currentSceneData = data;
     sceneSourceText = text;
     setSceneTab("chat");  // 默认显示「日常聊天」
     scenePanelEl.hidden = false;
     sceneLoadingEl.classList.remove("show");
-    if (CFG.autoSpeak && data.chat) speak(data.chat);
+    if (data.isDemo && sceneDemoNote) {
+      const hasEntry = !!sceneDemo[text];
+      sceneDemoNote.textContent = hasEntry
+        ? "※ 演示模式的内置示例，不是 AI 现场生成。接入 API 后，任意句子都能生成四场景表达。"
+        : "※ 演示模式：这句话暂无内置示例，下面是占位说明。接入 API 后即可生成真实表达。";
+      sceneDemoNote.hidden = false;
+    }
+    if (cfgAutoSpeak() && data.chat) speak(data.chat);
   } catch (err) {
+    if (my !== sceneSeq) return;
     sceneLoadingEl.textContent = "生成失败：" + err.message;  // 保留提示给用户看
   } finally {
-    sceneGoBtn.disabled = false;
+    if (my === sceneSeq) sceneGoBtn.disabled = false;
   }
 }
 
@@ -4566,6 +5324,21 @@ function nextDailyQuestion() {
   return null;
 }
 
+// 题号提示：两个口径分开（六.2）
+//   · 「本轮第 N 题」= 当前屏幕上这道题的位置（1 起），只在真正加载新题时前进
+//   · 「已完成 M 题」= 已作答题数（0 起），作答后立刻 +1
+// 因此作答后看到的仍是「第 1 题（已完成 1 题）」，点「下一题」才变成「第 2 题」。
+let dailyNo = 0;
+function updateDailyHint() {
+  const hintEl = document.getElementById("dailyHint");
+  if (!hintEl) return;
+  const plan = todayPlan();
+  const no = dailyNo || (progress.currentQuestionIndex + 1);
+  hintEl.textContent = "Day " + plan.day + " · " + plan.title +
+    "　本轮第 " + Math.min(no, progress.totalQuestions) + " / " + progress.totalQuestions +
+    " 题（已完成 " + progress.currentQuestionIndex + " 题）";
+}
+
 function loadDailyQuestion(customQ) {
   const qBox = document.getElementById("dailyQuestion");
   const oBox = document.getElementById("dailyOptions");
@@ -4578,6 +5351,8 @@ function loadDailyQuestion(customQ) {
   fb.textContent = "";
   oBox.innerHTML = "";
   if (tagBox) tagBox.innerHTML = "";
+  resetHintUI("daily");
+  currentDailyData = null;
 
   let data = customQ;
   if (!data) {
@@ -4590,29 +5365,30 @@ function loadDailyQuestion(customQ) {
   if (!data) {
     qBox.textContent = "今天的题目出完了，明天再来 👋";
     hintEl.textContent = "";
+    syncQuizControls("daily", true);
     return;
   }
 
   currentDailyData = data;
   currentDailyIndex++;
-  hintEl.textContent = "Day " + plan.day + " · " + plan.title + " · 今日第 " + progress.currentQuestionIndex + " 题";
-
-  qBox.innerHTML = "";
-  const span = document.createElement("span");
-  span.className = "hover-translation";
-  span.textContent = data.question;
-  span.setAttribute("data-translation", bestOf(data.options));
-  qBox.appendChild(span);
+  dailyNo = progress.currentQuestionIndex + 1;   // 新题加载 → 位置号就位
+  updateDailyHint();
+  qBox.textContent = data.question;
   renderQuestionTags(tagBox, data.tags);
 
   shuffle(data.options).forEach(option => {
     const btn = document.createElement("button");
     btn.className = "quiz-option";
+    btn.type = "button";
     btn.textContent = option.text;
-    if (option.meaning) btn.setAttribute("data-translation", option.keyword + " - " + option.meaning);
+    if (option.meaning && option.keyword) {
+      btn.classList.add("hover-translation");
+      btn.setAttribute("data-translation", option.keyword + " - " + option.meaning);
+    }
     btn.addEventListener("click", () => checkDailyAnswer(option.text, btn));
     oBox.appendChild(btn);
   });
+  syncQuizControls("daily", false);
 }
 
 function checkDailyAnswer(selected, btn) {
@@ -4620,8 +5396,9 @@ function checkDailyAnswer(selected, btn) {
   const fb = document.getElementById("dailyFeedback");
   const data = currentDailyData;
   if (!data) return;
+  if (!markAnswered("daily|" + data.question)) return;
   const allOptions = oBox.querySelectorAll(".quiz-option");
-  allOptions.forEach(o => o.classList.add("disabled"));
+  allOptions.forEach(o => { o.classList.add("disabled"); o.disabled = true; });
 
   const level = getLevel(selected, data.options);
   const best = bestOf(data.options);
@@ -4634,97 +5411,250 @@ function checkDailyAnswer(selected, btn) {
     level: level, selected: selected, best: best, fbBox: fb,
     data: data, mode: "choice"
   });
+  updateDailyHint();          // 作答后「已完成」立刻 +1
+  syncQuizControls("daily", false);
 }
 
 document.getElementById("dailyNext").addEventListener("click", () => {
   if (guardRoundDone()) return;
   loadDailyQuestion();
 });
+document.getElementById("dailySkip").addEventListener("click", () => {
+  if (guardRoundDone()) return;
+  trackEvent("skip", { mode: "daily", index: progress.currentQuestionIndex });
+  loadDailyQuestion();
+});
+document.getElementById("dailyHintBtn").addEventListener("click", () => {
+  const data = currentDailyData;
+  if (!data) return;
+  // 每日题在判题上走选择题逻辑（cfm 里 mode=choice），提示键也保持一致
+  hintUsed["choice|" + data.question] = true;
+  renderHint(document.getElementById("dailyHintOut"),
+             document.getElementById("dailyHintBtn"), buildChoiceHint(data));
+  trackEvent("hint", { mode: "daily", question: data.question });
+});
 document.getElementById("dailyOpenPath").addEventListener("click", openDayPath);
 
-// ================= 表达树模式 =================
-// 分步骤构造句子：每一步选择都能实时看到句子被拼出来
-let currentTree = null;      // {base, zh, steps}
-let treePicked = [];         // 每一步已选的选项下标
+// ================= 句子搭建模式 =================
+// 分步骤构造句子：默认展开当前一组，选完引导到下一组，完成的组收成摘要、可点击修改。
+// 必选成分不能跳过；可选成分可以「不添加」。
+let currentTree = null;      // {base, zh, zhTail, steps:[{name, optional, options}]}
+let treePicked = [];         // 每一步已选的选项下标；null = 未选
+let treeSkipped = [];        // 每一步是否被「不添加」（仅可选步骤可为 true）
 let treeRound = 0;
+let treeSeq = 0;             // 请求标识：防止旧的生成结果覆盖新的
 
 const treeInputEl = document.getElementById("treeInput");
+const treeInputWrap = document.getElementById("treeInputWrap");
+const treeInputSummary = document.getElementById("treeInputSummary");
+const treeInputTextEl = document.getElementById("treeInputText");
 const treePanelEl = document.getElementById("treePanel");
 const treeStepsEl = document.getElementById("treeSteps");
 const treePreviewEl = document.getElementById("treePreview");
 const treeZhEl = document.getElementById("treeZh");
+const treeNoteEl = document.getElementById("treeNote");
 const treeLoadingEl = document.getElementById("treeLoading");
 const treeErrorEl = document.getElementById("treeError");
 const treeAgainBtn = document.getElementById("treeAgain");
+const treeResetBtn = document.getElementById("treeReset");
 const treeSpeakBtn = document.getElementById("treeSpeak");
 const TREE_LOADING_TEXT = treeLoadingEl.textContent;
 
-// 用已选内容拼出完整句子；未选的槽位显示「…」
+// 某一步是否已确定（选了 或 明确跳过）
+function treeStepResolved(i) {
+  return treePicked[i] !== null && treePicked[i] !== undefined || treeSkipped[i];
+}
+// 某一步在句子里填什么；未确定 / 已跳过都返回 ""（跳过就是不加这段文字）
+function treeStepText(i) {
+  if (treeSkipped[i]) return "";
+  const pick = treePicked[i];
+  if (pick === null || pick === undefined) return "";
+  return currentTree.steps[i].options[pick].text;
+}
+
+// 拼英文整句：已确定的槽位填内容；跳过或未选的槽位去掉（含多余空格）
 function treeSentence() {
   if (!currentTree) return "";
   let s = currentTree.base;
   currentTree.steps.forEach((st, i) => {
-    const pick = treePicked[i];
-    const word = (pick === null || pick === undefined) ? "…" : st.options[pick].text;
-    s = s.split("{" + i + "}").join(word);
+    s = s.split("{" + i + "}").join(treeStepText(i));
   });
-  return s.replace(/\s+/g, " ").trim();
+  return s.replace(/\s+([.,!?;:])/g, "$1").replace(/\s+/g, " ").trim();
 }
-function treeComplete() {
-  return currentTree && currentTree.steps.every((_, i) => treePicked[i] !== null && treePicked[i] !== undefined);
+// 拼中文整句：核心中文 + 可选成分的中文（按 zhTail 模板，用各步选项的中文）
+// 注意语序：中文按中文自己的顺序拼，绝不把英文片段塞进来，也不残留 {n}。
+function treeSentenceZh() {
+  if (!currentTree) return "";
+  let zh = currentTree.zh || "";
+  const tailTpl = currentTree.zhTail || "";
+  if (!tailTpl) return zh.replace(/\s+/g, "");
+  let used = false;
+  const tail = tailTpl.replace(/\{(\d+)\}/g, (m, n) => {
+    const i = Number(n);
+    if (i >= currentTree.steps.length) return "";
+    const pick = treePicked[i];
+    if (treeSkipped[i] || pick === null || pick === undefined) return "";
+    const zhWord = currentTree.steps[i].options[pick].zh || "";
+    if (!zhWord) return "";
+    used = true;
+    return zhWord;
+  });
+  if (!used) return zh.replace(/\s+/g, "");
+  // 核心中文若以句末标点结尾，而后面还接附加成分，先去掉那个句号，避免出现「。，」
+  zh = zh.replace(/[。！？]$/, "");
+  return (zh + tail).replace(/\s+/g, "");
 }
 
+// 核心句是否完整 —— 所有「必选」步骤都已确定，就允许朗读（不要求可选项都填）
+function treeCoreComplete() {
+  if (!currentTree) return false;
+  return currentTree.steps.every((st, i) => st.optional || treeStepResolved(i));
+}
+// 预览：整句统一字号/行高/主色，只用淡背景标出「可替换的部分」。
+// 已跳过的可选项直接不出现（不留空档）；未选的显示为可点击的虚线槽位。
 function renderTreePreview() {
   if (!currentTree) return;
+  // 先算出每个槽位在「跳过」情况下是否应当消失
+  const hidden = currentTree.steps.map((_, i) => treeSkipped[i]);
+  // 若某槽位被跳过，要把 base 里它前后的空格一起吃掉 —— 用最终整句反推更稳妥：
+  // 这里逐个槽位渲染，跳过的不生成节点，并让相邻文本自然衔接
   treePreviewEl.innerHTML = "";
-  // 按占位符拆开渲染：未填的槽位显示为虚线下划线，已填的高亮
   const parts = currentTree.base.split(/(\{\d+\})/);
   parts.forEach(p => {
     const m = /^\{(\d+)\}$/.exec(p);
     if (m) {
       const i = Number(m[1]);
-      const pick = treePicked[i];
+      if (hidden[i]) return;                 // 跳过的可选项：不渲染节点
+      const txt = treeStepText(i);
       const slot = document.createElement("span");
-      slot.className = "slot" + (pick === null || pick === undefined ? "" : " filled");
-      slot.textContent = (pick === null || pick === undefined) ? "…" : currentTree.steps[i].options[pick].text;
+      slot.className = "slot" + (txt ? " filled" : "");
+      slot.textContent = txt || "…";
+      slot.title = txt ? "点击可修改这一部分" : "点击去选择";
+      // 片段本身可点、也能 Tab 到（键盘用户同样能跳到对应选择组）
+      slot.tabIndex = 0;
+      slot.setAttribute("role", "button");
+      slot.setAttribute("aria-label", (txt ? "修改：" + txt : "去选择：" + currentTree.steps[i].name));
+      const act = () => focusTreeStep(i);
+      slot.addEventListener("click", act);
+      slot.addEventListener("keydown", e => {
+        if (e.key === "Enter" || e.key === " ") { e.preventDefault(); act(); }
+      });
       treePreviewEl.appendChild(slot);
     } else if (p) {
       treePreviewEl.appendChild(document.createTextNode(p));
     }
   });
-  treeZhEl.textContent = currentTree.zh || "";
+  // 渲染是逐段的，跳过的槽位拿掉后可能出现双空格或「空格+句点」，
+  // 这里对渲染结果做一次空白归一化（含相邻文本节点合并）
+  normalizePreviewWhitespace();
+  // 中文：按中文自己的语序拼，绝不含 {0} 这类占位符
+  treeZhEl.textContent = treeSentenceZh();
+  // 英文输入不自然时的「更自然表达」提示
+  renderTreeNote();
 }
 
-function renderTreeSteps() {
-  treeStepsEl.innerHTML = "";
-  currentTree.steps.forEach((st, i) => {
-    const wrap = document.createElement("div");
-    const done = treePicked[i] !== null && treePicked[i] !== undefined;
-    // 只有前一步选完，当前步才「激活」，营造逐步构造的感觉
-    const active = !done && currentTree.steps.slice(0, i).every((_, k) => treePicked[k] !== null && treePicked[k] !== undefined);
-    wrap.className = "tree-step" + (done ? " done" : "") + (active ? " active" : "");
+// 把预览里的空白规范化：合并相邻文本节点、双空格压成一个、去掉标点前的空格
+function normalizePreviewWhitespace() {
+  let node = treePreviewEl.firstChild;
+  while (node) {
+    const next = node.nextSibling;
+    if (node.nodeType === 3 && next && next.nodeType === 3) {
+      node.textContent += next.textContent;
+      next.remove();
+      continue;    // 合并后重新处理同一个节点
+    }
+    node = next;
+  }
+  const walk = (n) => {
+    if (n.nodeType === 3) {
+      n.textContent = n.textContent.replace(/\s+/g, " ").replace(/\s+([.,!?;:])/g, "$1");
+      return;
+    }
+    [...n.childNodes].forEach(walk);
+  };
+  walk(treePreviewEl);
+  // 首尾多余的空白节点去掉
+  const first = treePreviewEl.firstChild;
+  if (first && first.nodeType === 3) first.textContent = first.textContent.replace(/^\s+/, "");
+  const last = treePreviewEl.lastChild;
+  if (last && last.nodeType === 3) last.textContent = last.textContent.replace(/\s+$/, "");
+}
 
-    const label = document.createElement("div");
+// 「原表达 → 更自然的表达 + 原因」：仅在识别出核心句里有明显可优化处时展示
+function renderTreeNote() {
+  if (!treeNoteEl) return;
+  const tip = currentTree && currentTree.tip;
+  if (!tip || !tip.from || !tip.to) { treeNoteEl.hidden = true; treeNoteEl.textContent = ""; return; }
+  treeNoteEl.hidden = false;
+  treeNoteEl.textContent = "原表达「" + tip.from + "」→ 更自然：" + tip.to + (tip.why ? "　（" + tip.why + "）" : "");
+}
+
+// 选完一组后，自动聚焦到下一组未确定的步骤
+function focusTreeStep(i) {
+  renderTreeSteps(i);
+  const el = treeStepsEl.querySelector('.tree-step[data-i="' + i + '"]');
+  if (el) {
+    el.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    const btn = el.querySelector(".tree-opt");
+    if (btn) btn.focus({ preventScroll: true });
+  }
+}
+
+// 渲染步骤列表：当前组展开，已完成组收成摘要（可点击展开修改）
+function renderTreeSteps(focusIdx) {
+  treeStepsEl.innerHTML = "";
+  // 当前应展开的组：传入了 focusIdx 用它；否则第一个未确定的组
+  let openIdx = (typeof focusIdx === "number") ? focusIdx : -1;
+  if (openIdx < 0) {
+    openIdx = currentTree.steps.findIndex((_, i) => !treeStepResolved(i));
+  }
+  currentTree.steps.forEach((st, i) => {
+    const resolved = treeStepResolved(i);
+    const expanded = i === openIdx;
+    const isLast = i === currentTree.steps.length - 1;
+    const wrap = document.createElement("div");
+    wrap.dataset.i = String(i);
+    // 必选且未确定、又不是当前展开组 → 提示它不能跳过（不会静默放过）
+    wrap.className = "tree-step" + (resolved ? " done" : "") + (expanded ? " active" : "");
+
+    // —— 头部：序号 + 名称 + 已选摘要 + 必选/可选标签 ——
+    const label = document.createElement("button");
+    label.type = "button";
     label.className = "tree-step-label";
+    label.setAttribute("aria-expanded", expanded ? "true" : "false");
     const idx = document.createElement("span");
     idx.className = "ts-idx";
-    idx.textContent = done ? "✓" : (i + 1);
+    idx.textContent = treeSkipped[i] ? "–" : (resolved ? "✓" : (i + 1));
     label.appendChild(idx);
-    label.appendChild(document.createTextNode("Step" + (i + 1) + "｜" + st.name));
-    if (done) {
-      const p = document.createElement("span");
-      p.className = "ts-picked";
-      p.textContent = st.options[treePicked[i]].text;
-      label.appendChild(p);
-    }
+    const nameSpan = document.createElement("span");
+    nameSpan.className = "ts-name";
+    nameSpan.textContent = st.name;
+    label.appendChild(nameSpan);
+    const tag = document.createElement("span");
+    tag.className = "ts-tag" + (st.optional ? " opt" : " req");
+    tag.textContent = st.optional ? "可选" : "必选";
+    label.appendChild(tag);
+    const picked = document.createElement("span");
+    picked.className = "ts-picked";
+    if (treeSkipped[i]) picked.textContent = "不添加";
+    else if (resolved) picked.textContent = st.options[treePicked[i]].text;
+    else picked.textContent = expanded ? "未选" : "未选（点击展开）";
+    label.appendChild(picked);
+    // 点头部 = 展开这一组去修改（允许回头改，不强制单向）
+    label.addEventListener("click", () => renderTreeSteps(i));
     wrap.appendChild(label);
 
+    if (!expanded) { treeStepsEl.appendChild(wrap); return; }
+
+    // —— 展开区：选项按钮 ——
     const opts = document.createElement("div");
     opts.className = "tree-opts";
     st.options.forEach((o, k) => {
       const b = document.createElement("button");
       b.type = "button";
-      b.className = "tree-opt" + (treePicked[i] === k ? " active" : "");
+      const on = !treeSkipped[i] && treePicked[i] === k;
+      b.className = "tree-opt" + (on ? " active" : "");
+      b.setAttribute("aria-pressed", on ? "true" : "false");
       b.appendChild(document.createTextNode(o.text));
       if (o.zh) {
         const z = document.createElement("span");
@@ -4734,26 +5664,61 @@ function renderTreeSteps() {
       }
       b.addEventListener("click", () => {
         treePicked[i] = k;
-        renderTreeSteps();
+        treeSkipped[i] = false;
         renderTreePreview();
+        // 选完引导到下一组；已是最后一组就收起当前组
+        renderTreeSteps(nextUnresolvedAfter(i, isLast));
         updateTreeActions();
       });
       opts.appendChild(b);
     });
+    // 可选项 → 提供「不添加」；必选项明确说明不能跳过
+    if (st.optional) {
+      const skip = document.createElement("button");
+      skip.type = "button";
+      skip.className = "tree-opt tree-skip" + (treeSkipped[i] ? " active" : "");
+      skip.setAttribute("aria-pressed", treeSkipped[i] ? "true" : "false");
+      skip.textContent = "不添加";
+      skip.addEventListener("click", () => {
+        treeSkipped[i] = true;
+        treePicked[i] = null;
+        renderTreePreview();
+        renderTreeSteps(nextUnresolvedAfter(i, isLast));
+        updateTreeActions();
+      });
+      opts.appendChild(skip);
+    } else {
+      const hint = document.createElement("div");
+      hint.className = "tree-req-hint";
+      hint.textContent = "这一部分是句子必需的，不能跳过。";
+      opts.appendChild(hint);
+    }
     wrap.appendChild(opts);
     treeStepsEl.appendChild(wrap);
   });
+  updateTreeActions();
+}
+
+// 下一个还未确定的组下标（用于自动引导）；没有则返回 -1（全部收起）
+function nextUnresolvedAfter(i, isLast) {
+  if (isLast) return -1;
+  const next = currentTree.steps.findIndex((_, k) => k > i && !treeStepResolved(k));
+  return next;
 }
 
 function updateTreeActions() {
-  const ok = treeComplete();
-  treeAgainBtn.disabled = !ok;
-  treeSpeakBtn.disabled = !ok;
+  // 朗读：核心句完整即可（不要求可选项都填完）；绝不能朗读未解析的占位符
+  treeSpeakBtn.disabled = !treeCoreComplete();
+  // 「重新搭配」：保留核心句，重置补充信息 —— 至少有一步才可用
+  treeResetBtn.disabled = !currentTree;
+  // 「换个表达」：核心句独立成句后即可换
+  treeAgainBtn.disabled = !treeCoreComplete();
 }
 
 async function runTree() {
   const text = treeInputEl.value.trim();
   if (!text) { treeInputEl.focus(); return; }
+  const my = ++treeSeq;
   const btn = document.getElementById("treeGo");
   btn.disabled = true;
   treeErrorEl.textContent = "";
@@ -4762,40 +5727,51 @@ async function runTree() {
   treeLoadingEl.textContent = TREE_LOADING_TEXT;
   treePanelEl.hidden = true;
   try {
+    let tree;
     if (!CFG.key) {
-      // 演示模式：用内置的橘子例子演示「分步构造」的交互
+      // 演示模式：用内置样例演示「分步搭建」的交互（明确标注是内置示例）
       await delay(500);
-      currentTree = DEMO_TREE;
+      tree = DEMO_TREE;
     } else {
-      currentTree = await generateTree(text);
+      tree = await generateQuizWithRetry(generateTree, text, "句子搭建");
     }
-    // 每步默认未选（null），让用户自己搭
-    treePicked = currentTree.steps.map(() => null);
+    if (my !== treeSeq) return;      // 已重新生成 → 丢弃这次
+    currentTree = tree;
+    treePicked = tree.steps.map(() => null);
+    treeSkipped = tree.steps.map(() => false);
     treeRound++;
     treePanelEl.hidden = false;
     treeLoadingEl.classList.remove("show");
-    renderTreeSteps();
+    // 生成成功：输入区收成「当前表达 + 修改」，保留原输入
+    treeInputTextEl.textContent = text;
+    treeInputSummary.hidden = false;
+    treeInputWrap.hidden = true;
     renderTreePreview();
-    updateTreeActions();
-    trackEvent("tree_start", { round: treeRound, steps: currentTree.steps.length });
+    renderTreeSteps();
+    trackEvent("tree_start", { round: treeRound, steps: tree.steps.length });
   } catch (err) {
+    if (my !== treeSeq) return;
     treeLoadingEl.classList.remove("show");
     treeErrorEl.className = "quiz-feedback show wrong-fb";
     treeErrorEl.textContent = "生成失败：" + err.message;
   } finally {
-    btn.disabled = false;
+    if (my === treeSeq) btn.disabled = false;
   }
 }
 
-// 演示模式的表达树样例（未填 Key 时也能体验分步构造）
+// 演示模式的句子搭建样例（未填 Key 时也能体验分步搭建）。
+// 刻意一步必选、一步可选，展示两者的区别：
+//   形容词是必选（去掉会得到「I want a orange」，不成句）；
+//   场景是可选（可以「不添加」，核心句依然完整）。
 const DEMO_TREE = {
   base: "I want a {0} orange {1}.",
-  zh: "我想吃一个…的橘子…。",
+  zh: "我想要一个橘子。",
+  zhTail: "，{1}",
   steps: [
-    { name: "选一个形容词", options: [
+    { name: "选一个形容词", optional: false, options: [
       { text: "juicy", zh: "多汁的" }, { text: "fresh", zh: "新鲜的" }, { text: "sweet", zh: "甜的" }
     ] },
-    { name: "选一个场景", options: [
+    { name: "选一个场景", optional: true, options: [
       { text: "for breakfast", zh: "当早餐" }, { text: "after dinner", zh: "饭后" }, { text: "right now", zh: "现在" }
     ] }
   ]
@@ -4803,19 +5779,36 @@ const DEMO_TREE = {
 
 document.getElementById("treeGo").addEventListener("click", runTree);
 treeInputEl.addEventListener("keydown", e => { if (e.key === "Enter") runTree(); });
-document.getElementById("treeAgain").addEventListener("click", () => {
-  // 「再来一个表达」：同样的步骤结构重新选一遍（换个说法再搭一次）
+
+// 「修改原句」：回到保留原输入的编辑区
+document.getElementById("treeEditInput").addEventListener("click", () => {
+  treeInputWrap.hidden = false;
+  treeInputSummary.hidden = true;
+  treeInputEl.focus();
+});
+// 「重新搭配」：保留核心句，重置补充信息，焦点回到选择区（不重开新例句）
+treeResetBtn.addEventListener("click", () => {
   if (!currentTree) return;
   treePicked = currentTree.steps.map(() => null);
-  treeRound++;
-  renderTreeSteps();
+  treeSkipped = currentTree.steps.map(() => false);
   renderTreePreview();
-  updateTreeActions();
+  renderTreeSteps();
+  const first = treeStepsEl.querySelector(".tree-step");
+  if (first) first.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  trackEvent("tree_reset", { round: treeRound });
+});
+// 「换个表达」：输入新的一句，重新生成一套新的搭建步骤
+treeAgainBtn.addEventListener("click", () => {
+  treeInputWrap.hidden = false;
+  treeInputSummary.hidden = true;
+  treePanelEl.hidden = true;
+  treeInputEl.value = "";
   treeInputEl.focus();
   trackEvent("tree_again", { round: treeRound });
 });
 treeSpeakBtn.addEventListener("click", () => {
-  if (treeComplete()) speak(treeSentence());
+  // 只有核心句完整时才读；读的是拼好的整句（跳过 / 未选的可选项不会读成占位符）
+  if (treeCoreComplete()) speak(treeSentence());
 });
 
 // ================= ④ 错题本面板 =================
@@ -4894,15 +5887,25 @@ document.getElementById("wrongClear").addEventListener("click", () => {
   if (!wrongBook.length) return;
   if (confirm("确定清空错题本吗？清空后无法恢复。")) clearWrong();
 });
-// 只练错题：整轮都用错题本里的题目（不重新请求 AI），错得多的先出
+// 只练错题：整轮都用错题本里的原题（不重新请求 AI）。
+// 本轮题目数量 = 错题数（有几道就练几道，不再强行凑到 3~10 道），
+// 题目队列固定后在轮内逐题取出，每题按自身 mode 用对应渲染器 ——
+// 选择题错题用选择题、填空题错题用填空题，混合存在也能各走各的。
 document.getElementById("wrongPractice").addEventListener("click", () => {
   if (!wrongBook.length) return;
   closeOverlay("wrongBook");
-  const hasBlank = wrongBook.some(w => (w.mode || "choice") === "blank");
-  const mode = hasBlank ? "blank" : "choice";   // 优先练错题里更常见的题型
-  startRound(Math.min(Math.max(wrongBook.length, 3), DAILY_SIZE));
-  activeWrong = true;                           // 整轮锁定「只练错题」
-  switchMode(mode);                             // switchMode 会保留本轮来源，再出第一题
+  const queue = buildWrongQueue();     // 先排好队列（错得多的靠前）
+  const total = queue.length;
+  startRound(total);                   // 清进度/队列，本轮题数 = 错题数
+  roundQueue = queue;                  // 灌入排好的队列
+  activeWrong = true;                  // 整轮锁定「只练错题」
+  // 直接进第一个题目对应的渲染页；其余题目由 loadNextWrongQuestion 在轮内切换
+  const first = roundQueue[0];
+  const mode = first && first.mode === "blank" ? "blank" : "choice";
+  suppressAutoload = true;
+  try { switchMode(mode); } finally { suppressAutoload = false; }
+  showToast("本轮共 " + total + " 道错题，按错得多的顺序练。");
+  loadNextWrongQuestion();
 });
 
 // ================= ⑤ 每日路径面板 =================
@@ -4972,10 +5975,15 @@ function toggleDayPath() {
   else openDayPath();
 }
 
-// 开始一轮每日练习
+// 开始一轮每日练习。
+// 关键：只加载一次首题 —— switchMode("daily") 默认会自动出一题，
+// 这里用 suppressAutoload 抑制它，再自己调一次 loadDailyQuestion，
+// 否则会连续出两道题（白白消耗题池、进度也偏）。
 function startDailyRound() {
-  switchMode("daily");
+  suppressAutoload = true;
+  try { switchMode("daily"); } finally { suppressAutoload = false; }
   startRound(DAILY_SIZE);
+  dailyInputPool.length = 0;
   loadDailyQuestion();
 }
 
@@ -5086,19 +6094,24 @@ function drawShareCard() {
   ctx.font = "600 26px 'PingFang SC','Microsoft YaHei',sans-serif";
   ctx.fillText("英语表达练习器", W / 2, pad + 92);
 
+  // 标题：用真实的题数与学习日期，不虚构「练习了 10 分钟」这类没测过的时间
   ctx.fillStyle = "#2b3150";
-  ctx.font = "800 46px 'PingFang SC','Microsoft YaHei',sans-serif";
-  ctx.fillText("Today I practiced English", W / 2, pad + 172);
-  ctx.fillText("for 10 minutes", W / 2, pad + 232);
+  ctx.font = "800 42px 'PingFang SC','Microsoft YaHei',sans-serif";
+  ctx.fillText("Today I practiced", W / 2, pad + 168);
+  const n = (s.sentences || []).length;
+  ctx.fillText(s.today + " sentences", W / 2, pad + 224);
+  ctx.fillStyle = "#9aa0b0";
+  ctx.font = "600 24px 'PingFang SC','Microsoft YaHei',sans-serif";
+  ctx.fillText(s.dateText || todayKey(), W / 2, pad + 266);
 
   ctx.strokeStyle = "#eceefa";
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(pad + 70, pad + 292);
-  ctx.lineTo(W - pad - 70, pad + 292);
+  ctx.moveTo(pad + 70, pad + 306);
+  ctx.lineTo(W - pad - 70, pad + 306);
   ctx.stroke();
 
-  // 三个数字
+  // 数字行：全部来自真实记录
   const rows = [
     ["✔", s.today + " 道题", "#389e0d"],
     ["◎", s.accuracy + "% 正确率", "#4a5ca8"],
