@@ -1,25 +1,21 @@
 @echo off
-rem English Practice Tool launcher - starts local proxy server and opens browser
+rem English Practice Tool launcher - run local proxy server in this window
 cd /d "%~dp0"
 
-rem try `py` first, then `python`
-py -3 --version >nul 2>nul
-if %errorlevel%==0 goto run_py
-python --version >nul 2>nul
-if %errorlevel%==0 goto run_python
+set "PY="
+py -3 --version >nul 2>nul && set "PY=py -3"
+if not defined PY python --version >nul 2>nul && set "PY=python"
+if not defined PY (
+  echo [ERROR] Python not found. Please install Python 3 first: https://www.python.org/downloads/
+  pause
+  exit /b
+)
 
-echo [ERROR] Python not found. Please install Python 3 first: https://www.python.org/downloads/
-pause
-exit /b
-
-:run_python
-start "English Trainer Server" python -u server.py
-goto open
-
-:run_py
-start "English Trainer Server" py -3 -u server.py
-
-:open
-timeout /t 1 /nobreak >nul
+title English Trainer Server
 start "" http://localhost:8080
-exit /b
+timeout /t 1 /nobreak >nul
+%PY% -u server.py
+
+echo.
+echo Server stopped. Press any key to close.
+pause >nul
