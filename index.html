@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>英语表达练习器</title>
+<!-- 内联 favicon：避免浏览器请求 /favicon.ico 得到 404，在 Console 里留下无意义的红字 -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23667eea'/%3E%3Ctext x='16' y='23' font-size='18' text-anchor='middle' fill='%23fff' font-family='sans-serif'%3EAb%3C/text%3E%3C/svg%3E">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -394,6 +396,9 @@
   .hero-btn:hover { box-shadow: 0 8px 22px rgba(0,0,0,.2); }
   .hero-btn:active { transform: scale(.98); }
   .hero-card.done .hero-btn { background: rgba(255,255,255,.9); }
+  /* 有没做完的一轮 → 卡片带一点「暂停中」的提示色，与「今日已完成」区分开 */
+  .hero-card.resume { box-shadow: 0 12px 30px rgba(102,126,234,.32), 0 0 0 3px rgba(255,255,255,.35) inset; }
+  .hero-card.resume .hero-btn { background: rgba(255,255,255,.94); }
 
   /* 自由练习折叠入口 */
   .explore-toggle {
@@ -421,6 +426,14 @@
   .mode-btn.active {
     background: #667eea; color: #fff; border-color: #667eea; font-weight: bold;
   }
+  /* 「继续上次练习」入口：整行占位，样式是次级按钮（不抢今日训练主卡片的权重） */
+  .mode-btn.resume {
+    flex: 1 0 100%; max-width: none;
+    background: #f4f6ff; border-color: #c9d1f0; color: #5a63c8; font-weight: 600;
+    border-style: dashed;
+  }
+  .mode-btn.resume:hover { background: #eaeefb; }
+  .mode-btn.resume[hidden] { display: none; }
 
   /* 练习题界面 */
   .quiz-container { display: none; }
@@ -895,11 +908,106 @@
   /* —— 顶部栏进度条在「查看模式」下的今日态 —— */
   .tb-today-hint { font-size: 11.5px; color: #a8adb8; margin-left: 2px; white-space: nowrap; }
   @media (max-width: 640px) { .tb-today-hint { display: none; } }
+
+  /* ============================================================
+     ▼ 导航系统（页面返回体验）
+     · PageHeader  ：二级页面统一的「← 返回 / 标题」
+     · 顶部条左端   ：练习中的返回（不抢进度条位置）
+     · 返回确认弹窗：训练未完成时的轻量确认
+     一律用 Ghost / 次级样式，视觉权重低于「开始训练」「下一题」等主按钮
+
+     只保留一个出口按钮：parentOf() 目前恒为 home（没有多级路由），
+     「返回」与「回首页」是同一个动作，并排两个按钮会让人以为落点不同。
+     将来真加了层级（例如 场景表达 → 某场景 → 该场景练习），
+     再在这里补一个「🏠 首页」按钮，直接调 leavePage 之外的直达首页逻辑。
+     ============================================================ */
+
+  /* —— PageHeader（页面内导航条）—— */
+  /* sticky：内容较长的页面（场景表达 / 表达树）滚动后返回键依然在视野里，
+     不必滚回顶部才找得到返回（要求「页面滚动后仍然应该容易找到返回方式」） */
+  /* grid 而非 flex：左右两列都是 1fr，右侧即使空着宽度也与左侧相等，
+     标题才是真正居中（flex 下只剩左边一个按钮时标题会整体偏右） */
+  .page-head {
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px;
+    position: sticky; top: 0; z-index: 20;
+    margin: 0 0 14px; padding: 4px 0 8px;
+    background: #fff;
+  }
+  .page-head[hidden] { display: none; }
+  .page-head .nav-btn { justify-self: start; }
+  .page-head .ph-title {
+    min-width: 0; text-align: center;
+    font-size: 14px; font-weight: 700; color: #4a5070;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nav-btn {
+    flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+    gap: 5px; min-height: 38px; padding: 8px 14px;
+    background: #fff; color: #6b7288;
+    border: 1px solid #e3e6f2; border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(60,70,160,.06);
+    font-family: inherit; font-size: 13.5px; line-height: 1; cursor: pointer;
+    transition: background .15s, border-color .15s, color .15s, transform .08s;
+  }
+  .nav-btn:hover { background: #f7f8ff; border-color: #c9d1f0; color: #667eea; }
+  .nav-btn:active { transform: scale(.95); }
+  .nav-btn .nb-ico { font-size: 14px; line-height: 1; }
+  /* 类里的 display:inline-flex 会盖掉浏览器对 [hidden] 的默认 display:none，
+     练习中隐藏页内返回键必须靠这条显式规则，否则会和顶部条的返回键重复 */
+  .nav-btn[hidden] { display: none; }
+
+  /* —— 顶部固定条左端的返回 —— */
+  #topBar .tb-nav { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 7px; }
+  .tb-nav-btn {
+    flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px;
+    min-height: 36px; padding: 7px 12px;
+    background: #f4f5fb; color: #6b7288; border: 1px solid #e3e6f2;
+    border-radius: 10px; font-family: inherit; font-size: 13px; line-height: 1;
+    cursor: pointer; transition: background .15s, border-color .15s, color .15s, transform .08s;
+  }
+  .tb-nav-btn:hover { background: #eaeefb; border-color: #c9d1f0; color: #667eea; }
+  .tb-nav-btn:active { transform: scale(.94); }
+  .tb-nav-btn .nb-ico { font-size: 14px; line-height: 1; }
+
+  /* —— 返回确认弹窗（轻量、不抢练习区视觉）—— */
+  #navConfirm { z-index: 120; }
+  .navc-box {
+    width: 100%; max-width: 380px;
+    background: #fff; border-radius: 16px; padding: 24px 22px 18px;
+    box-shadow: 0 24px 70px rgba(24,20,60,.35); animation: popIn .16s ease;
+    text-align: center;
+  }
+  .navc-ico { font-size: 30px; line-height: 1; }
+  .navc-title {
+    font-size: 16.5px; font-weight: 800; color: #2b3150; margin-top: 12px;
+  }
+  .navc-progress {
+    display: inline-block; margin-top: 12px; padding: 6px 15px;
+    background: #f4f6ff; border: 1px solid #e1e6fb; border-radius: 999px;
+    font-size: 14px; font-weight: 700; color: #5a63c8;
+    font-variant-numeric: tabular-nums;
+  }
+  .navc-desc { font-size: 12.5px; color: #8a93bb; line-height: 1.6; margin-top: 11px; }
+  .navc-actions { display: flex; gap: 10px; margin-top: 18px; }
+  .navc-actions button { flex: 1 1 0; min-width: 0; }
+
+  @media (max-width: 640px) {
+    .nav-btn { min-height: 40px; padding: 9px 13px; font-size: 13.5px; }
+    .tb-nav-btn { min-height: 38px; padding: 8px 11px; }
+    .page-head { margin: 2px 0 12px; gap: 6px; }
+    .page-head .ph-title { font-size: 13.5px; }
+  }
 </style>
 </head>
 <body>
   <!-- ============ 顶部固定进度条（Duolingo 风格：进度 + 🔥streak + 入口）============ -->
   <div id="topBar">
+    <!-- 练习进行中的统一导航：返回（不占用进度条的位置；落点即首页，详见「导航系统」） -->
+    <div class="tb-nav">
+      <button class="tb-nav-btn" id="tbBack" type="button" title="返回首页">
+        <span class="nb-ico">←</span><span>返回</span>
+      </button>
+    </div>
     <div class="tb-progress">
       <div class="tb-track"><div class="tb-fill" id="tbFill"></div></div>
       <span class="tb-count" id="tbCount">0 / 10</span>
@@ -996,7 +1104,22 @@
         <div class="share-actions">
           <button id="doneShare" class="btn-primary" style="flex:1;">📸 生成分享卡片</button>
           <button id="doneClose" class="btn-outline" style="flex:1;">再练一组</button>
+          <button id="doneHome" class="btn-outline" style="flex:1 0 100%;">🏠 返回首页</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 训练进行中的返回确认（轻量弹窗，不用浏览器原生 alert） -->
+  <div class="overlay" id="navConfirm">
+    <div class="navc-box">
+      <div class="navc-ico">✍️</div>
+      <div class="navc-title" id="navcTitle">今天的训练还没有完成</div>
+      <div class="navc-progress" id="navcProgress">0 / 10</div>
+      <div class="navc-desc" id="navcDesc">训练进度会自动保存，下次可以继续。</div>
+      <div class="navc-actions">
+        <button class="btn-primary" id="navcKeep" type="button">继续训练</button>
+        <button class="btn-outline" id="navcLeave" type="button">返回首页</button>
       </div>
     </div>
   </div>
@@ -1024,6 +1147,8 @@
 
     <!-- ② 自由练习：收纳其余模式（默认折叠） -->
     <div class="mode-selector" id="explorePanel" hidden>
+      <!-- 非每日训练做了一半就返回时，在这里给出入口（内容由 JS 填充） -->
+      <button class="mode-btn resume" id="resumeChip" hidden></button>
       <button class="mode-btn" data-mode="view">查看表达</button>
       <button class="mode-btn" data-mode="scene">场景表达</button>
       <button class="mode-btn" data-mode="tree">表达树</button>
@@ -1171,6 +1296,10 @@
 
     <!-- 查看模式 (原有界面) -->
     <div id="viewMode" class="view-mode">
+      <div class="page-head" id="phView" hidden>
+        <button class="nav-btn" type="button" data-back><span class="nb-ico">←</span><span>返回</span></button>
+        <div class="ph-title">查看表达</div>
+      </div>
       <textarea id="input" placeholder="请输入一句中文，例如：我想吃一个橘子"></textarea>
 
       <div class="row">
@@ -1191,6 +1320,10 @@
 
     <!-- 场景表达模式 -->
     <div id="sceneMode" class="quiz-container">
+      <div class="page-head" id="phScene" hidden>
+        <button class="nav-btn" type="button" data-back><span class="nb-ico">←</span><span>返回</span></button>
+        <div class="ph-title">场景表达</div>
+      </div>
       <textarea id="sceneInput" placeholder="请输入一句中文，例如：这里的风景真美"></textarea>
       <div class="row"><button id="sceneGo">生成场景表达</button></div>
       <div id="sceneLoading" class="loading">思考中… 正在为四种场景组织表达</div>
@@ -1214,6 +1347,10 @@
 
     <!-- 每日路径模式 -->
     <div id="dailyMode" class="quiz-container">
+      <div class="page-head" id="phDaily" hidden>
+        <button class="nav-btn" type="button" data-back><span class="nb-ico">←</span><span>返回</span></button>
+        <div class="ph-title">每日路径</div>
+      </div>
       <div class="quiz-question">
         <div class="zh-text" id="dailyQuestion">准备开始今天的练习…</div>
         <div class="q-tags" id="dailyTags"></div>
@@ -1229,6 +1366,10 @@
 
     <!-- 表达树模式（分步骤构造句子） -->
     <div id="treeMode" class="quiz-container">
+      <div class="page-head" id="phTree" hidden>
+        <button class="nav-btn" type="button" data-back><span class="nb-ico">←</span><span>返回</span></button>
+        <div class="ph-title">表达树</div>
+      </div>
       <textarea id="treeInput" placeholder="请输入一个核心表达，例如：I want an orange"></textarea>
       <div class="row"><button id="treeGo">生成表达树</button></div>
       <div id="treeLoading" class="loading">思考中… 正在把句子拆成可替换的步骤</div>
@@ -1982,6 +2123,7 @@ const LS = {
   wrong: "eng_wrong",           // 错题本 Question[]
   daily: "eng_daily",           // 每日路径打卡 {dayIndex, doneDates[]}
   session: "eng_session",       // 上一轮练习的小结（用于完成面板/分享卡）
+  resume: "eng_resume",         // 进行中训练的续练快照（返回首页后可「继续今日训练」）
   lastPractice: "eng_last_practice",  // 上次练习日期，用于跨天判定
   train: "eng_train"            // 训练打卡账本 {streak, lastDate, history[]}
 };
@@ -2150,13 +2292,56 @@ function startRound(total) {
   // maxStreak 是跨轮保留的最好成绩，不重置
   activeWrong = false;
   activeTagPool = null;
+  clearSnapshot();      // 新的一轮开始 → 上一轮没做完的续练点作废
   setTopBarVisible(true);
   updateTopBar();
+}
+
+// 离开未完成的一轮：把「来源 + 题型 + 当前题」存成快照，供首页「继续今日训练」
+// 注意：只存来源与下标，不存 AI 生成的题目内容（localStorage 配额有限，
+// 且回来时按同一来源重新出题即可，不必重新请求 AI）
+// 一题都没答（0/N）时不留续练点：这时候没什么可丢的，留了反而让首页
+// 一直显示「继续今日训练」，把一个还没开始的练习说成"练了一半"
+function leaveRound() {
+  if (!isPracticeMode(currentScreen) || isRoundDone()) return;
+  if (progress.currentQuestionIndex <= 0) return;
+  saveSnapshot({
+    mode: currentScreen,
+    total: progress.totalQuestions,
+    idx: progress.currentQuestionIndex,
+    wrong: !!activeWrong,
+    tagPool: activeTagPool ? activeTagPool.slice() : null,
+    date: todayKey()
+  });
 }
 function setTopBarVisible(on) {
   if (!topBarEl) return;
   topBarEl.classList.toggle("show", !!on);
   document.body.classList.toggle("hasTopBar", !!on);
+}
+
+// ================= 续练快照（「返回首页 → 继续今日训练」）=================
+// 进度本身（eng_progress / eng_stats / eng_train）一直是实时落盘的，返回首页不会丢；
+// 这里额外记住「练习来源 + 题型 + 当前那道题」，让用户回来时从原处接着做，
+// 而不是重开一轮、从第 1 题重新开始。
+// 注意：不保存 AI 生成的整题内容，只保存来源与题目下标 ——
+// 避免把大量题目写进 localStorage（配额很小），也避免返回后重新请求 AI。
+let resumeSnapshot = lsGet(LS.resume, null);
+function saveSnapshot(snap) {
+  resumeSnapshot = snap;
+  lsSet(LS.resume, snap);
+}
+function clearSnapshot() {
+  resumeSnapshot = null;
+  try { localStorage.removeItem(LS.resume); } catch (e) {}
+}
+// 是否停着一轮没做完的训练
+function hasPausedRound() {
+  return !!(resumeSnapshot && !isRoundDone());
+}
+// 快照是否属于「今日训练」（每日路径）——首页大卡片只认它
+function isResumeDaily() {
+  return !!(resumeSnapshot && resumeSnapshot.mode === "daily");
 }
 
 // 记一次作答：更新进度 / streak / 统计，并给出反馈方向
@@ -2181,6 +2366,9 @@ function recordAnswer(level) {
   if (correct) { stats.correct++; stats.todayCorrect++; }
 
   updateTopBar();
+
+  // 做完最后一题 → 续练快照已完成，等完成页收尾时清掉
+  if (isPracticeMode(currentScreen)) syncRoundNav();
 
   trackEvent("answer", {
     level: level, streak: progress.streak, correct: correct,
@@ -2848,10 +3036,20 @@ const heroSubEl = document.getElementById("heroSub");
 const heroMetaEl = document.getElementById("heroMeta");
 const heroCardEl = document.querySelector(".hero-card");
 
+// 当前真正显示在屏幕上的一层（含 "home"）
+// CFG.mode 记的是"上次用的练习模式"（要落盘，且 switchMode("home") 不会改它），
+// 判断"我现在是不是在首页/是不是在做题"必须用 currentScreen，不能用 CFG.mode
+let currentScreen = "home";
+// 续练时置 true：告诉 switchMode 不要自动出题（题池已由续练逻辑备好）
+let suppressAutoload = false;
+
 // 模式切换逻辑
 function switchMode(mode) {
   // 进入任何具体模式时收起首页主卡片（"home" 是首页态，不属任何模式）
   const isHome = mode === "home";
+  // 真正换层时，先离开的那一页留一份「当时的样子」，供返回时还原
+  if (mode !== currentScreen) snapshotCtx(currentScreen);
+  currentScreen = mode;
   if (homeHero) homeHero.hidden = !isHome;
   if (!isHome) setExploreOpen(false);
   if (!isHome) CFG.mode = mode;
@@ -2878,6 +3076,14 @@ function switchMode(mode) {
   treeMode.classList.toggle("show", mode === "tree");
   dailyMode.classList.toggle("show", mode === "daily");
 
+  // 二级页面统一导航条：首页绝不显示（详见「导航系统」一段）
+  showPageHeader(mode);
+  syncHistory(mode);
+  // 回到首页就把大卡片重新算一遍：打卡天数 / 今日进度 / 「继续今日训练」按钮
+  // 练习中 updateTopBar 里的刷新会因为首页隐藏而跳过，这里必须补上，
+  // 否则返回首页看到的还是进入练习前的旧数字
+  if (isHome) refreshHome();
+
   // 顶部进度条只在「需要做题」的模式里出现（查看/场景/表达树是自由探索，不占屏幕）
   const needsTopBar = mode === "choice" || mode === "blank" || mode === "daily";
   setTopBarVisible(needsTopBar);
@@ -2888,7 +3094,10 @@ function switchMode(mode) {
   }
 
   // 切换到练习模式时加载第一题
-  if (mode === "choice") {
+  // suppressAutoload：续练时题目池已按进度备好，由调用方自己出题，这里不要抢先出一题
+  if (suppressAutoload) {
+    // 手动接管出题，跳过自动加载
+  } else if (mode === "choice") {
     loadChoiceQuestion();
   } else if (mode === "blank") {
     loadBlankQuestion();
@@ -2906,6 +3115,224 @@ modeButtons.forEach(btn => {
   btn.addEventListener("click", () => switchMode(btn.dataset.mode));
 });
 
+// ================= 导航系统（返回）=================
+// 现状：项目没有路由库，页面切换靠 switchMode() 条件渲染。这里沿用同一套方案，
+// 不引入任何路由；只做三件事：
+//   ① 二级页面统一挂 PageHeader（← 返回 / 标题）
+//   ② 练习中的模式把返回键放进顶部固定条（滚动后依然找得到）
+//   ③ 把「当前模式」同步进 history.state，让浏览器后退键也能用
+// 出口只有一个：leavePage()。原先页头并排放着「← 返回」和「🏠 首页」，
+// 但 parentOf() 恒为 home，两个按钮落点完全相同 —— 并排只会让人以为有区别，故合并。
+const MODE_META = {
+  home:   { title: "首页",     page: false, topbar: false },
+  view:   { title: "查看表达", page: true,  topbar: false },
+  scene:  { title: "场景表达", page: true,  topbar: false },
+  tree:   { title: "表达树",   page: true,  topbar: false },
+  choice: { title: "选择题",   page: true,  topbar: true  },
+  blank:  { title: "填空题",   page: true,  topbar: true  },
+  daily:  { title: "每日路径", page: true,  topbar: true  }
+};
+// 需要做题的模式（有进度、有未完成一说）
+function isPracticeMode(mode) {
+  return !!(MODE_META[mode] && MODE_META[mode].topbar);
+}
+
+const pageHeads = {
+  view:   document.getElementById("phView"),
+  scene:  document.getElementById("phScene"),
+  tree:   document.getElementById("phTree"),
+  choice: document.getElementById("phChoice"),
+  blank:  document.getElementById("phBlank"),
+  daily:  document.getElementById("phDaily")
+};
+
+// 各页面「离开时」的上下文：输入框内容 + 滚动位置
+// （只放内存，不落盘；目的只是让返回后看到的还是刚离开时的样子）
+// 首页也记（只记滚动位置），这样从二级页回到首页能停在上次看到的地方
+const modeCtx = {};
+function snapshotCtx(mode) {
+  if (!MODE_META[mode]) return;
+  const ctx = { text: "", scroll: window.scrollY || 0 };
+  try {
+    if (mode === "view" && inputEl) ctx.text = (inputEl.value || "").trim();
+    else if (mode === "scene" && sceneInputEl) ctx.text = (sceneInputEl.value || "").trim();
+    else if (mode === "tree" && treeInputEl) ctx.text = (treeInputEl.value || "").trim();
+  } catch (e) {}
+  modeCtx[mode] = ctx;
+}
+// 每个页面的「上一层」是谁 —— 决定「← 返回」回到哪一层
+// 本项目没有真正的多级路由：所有功能页都是首页的直接子页（首页 → 自由练习列表 → 具体题型），
+// 所以上一层统一是 home。这里用函数而不是变量记录，是为了避免"从选择题直接跳到填空题"
+// 这类同级切换被误当成"更深一层"，从而让「返回」退到另一个题型去。
+// 以后真要加多级层级（例如 场景表达 → 某个场景 → 该场景练习），改这里返回即可 ——
+// leavePage() 是按它逐层回退的，届时再加一个「🏠 首页」用于一步跳到顶。
+function parentOf(mode) {
+  return "home";
+}
+
+// 二级页面导航条：首页不显示；
+// 练习模式在「一轮进行中」时由顶部固定条接管，页内返回键先让位，避免两个返回按钮打架
+function showPageHeader(mode) {
+  Object.keys(pageHeads).forEach(m => {
+    const head = pageHeads[m];
+    if (head) head.hidden = (m !== mode);
+  });
+  const head = pageHeads[mode];
+  if (!head) return;
+  const backBtn = head.querySelector("[data-back]");
+  if (backBtn) backBtn.hidden = !!(isPracticeMode(mode) && !isRoundDone());
+}
+
+// —— 浏览器前进/后退：把「模式」当成一层历史 ——
+let navPopping = false;    // 本次 history 变化来自用户按了后退/前进（不再压栈）
+let historyInit = false;   // 首次同步用 replaceState，避免多出一层空历史
+
+function syncHistory(mode) {
+  if (navPopping) return;
+  try {
+    if (!historyInit) {
+      historyInit = true;
+      history.replaceState({ mode: mode }, "", location.href);
+      return;
+    }
+    if (history.state && history.state.mode === mode) return;  // 状态没变，不重复压栈
+    history.pushState({ mode: mode }, "", location.href);
+  } catch (e) { /* 某些环境（file:// 等）可能限制 history，忽略即可，页内导航不受影响 */ }
+}
+
+window.addEventListener("popstate", e => {
+  const st = e.state;
+  // 退到了本应用之外的历史项 → 交给浏览器，什么都不做（不把用户困在页面里）
+  if (!st || !MODE_META[st.mode]) return;
+  if (st.mode === currentScreen) return;
+  // 浏览器后退键也要走同一套确认：练习做到一半就退出去，先把这一层压回去，
+  // 让用户明确选择「继续训练」还是「返回首页」，而不是被无声地踢出练习
+  if (hasUnsavedRound()) {
+    history.pushState({ mode: currentScreen }, "", location.href);
+    openNavConfirm();
+    return;
+  }
+  navPopping = true;
+  try { switchMode(st.mode); } finally { navPopping = false; }
+});
+
+// —— 离开练习的兜底：已经答过题但没做完，先确认，别让进度无声消失 ——
+// 一题没答就直接走（没有进度可丢，弹窗只会碍事）
+function hasUnsavedRound() {
+  if (!isPracticeMode(currentScreen) || isRoundDone()) return false;
+  return progress.currentQuestionIndex > 0;
+}
+function openNavConfirm() {
+  const total = progress.totalQuestions || DEFAULT_TOTAL;
+  const idx = Math.min(progress.currentQuestionIndex, total);
+  const isDaily = currentScreen === "daily";
+  document.getElementById("navcTitle").textContent =
+    isDaily ? "今天的训练还没有完成" : "这一轮练习还没有完成";
+  document.getElementById("navcProgress").textContent = "当前进度：" + idx + " / " + total;
+  document.getElementById("navcDesc").textContent =
+    "训练进度会自动保存，下次可以继续，不会重新从第 1 题开始。";
+  document.getElementById("navcLeave").textContent = isDaily ? "返回首页" : "保存并返回首页";
+  openOverlay("navConfirm");
+}
+
+// 离开当前页 —— 全站唯一的出口动作
+// 页内 PageHeader 的「← 返回」和顶部固定条的「← 返回」都接到这里，
+// 所以无论从哪儿点，落点都一致：回到 parentOf(当前页)。
+// 本项目 parentOf() 恒为 home（没有多级路由），实际就是回首页；
+// 将来真加了中间层，这里会自动逐层返回，那时再加一个独立的「🏠 首页」直接跳首页即可。
+function leavePage() {
+  const from = currentScreen;
+  const to = parentOf(from);
+  leaveRound();                        // 有未完成的一轮就存快照，供「继续今日训练」
+  // 用 replaceState 而不是 pushState：把"练习页"这一层历史换成目标页，
+  // 避免浏览器后退键在首页与练习页之间来回弹（导航绕圈）
+  navPopping = true;
+  try {
+    switchMode(to);   // 内部会 snapshotCtx(from)，把刚离开那页的样子（输入框/滚动）存下来
+    if (historyInit) history.replaceState({ mode: to }, "", location.href);
+  } finally {
+    navPopping = false;
+  }
+  if (to === "home") {
+    setExploreOpen(true);   // 第一层的上一层就是「自由练习」列表，顺手展开
+    keepInput(from);        // 刚写的输入框内容留着，下次再进来还在
+    window.scrollTo(0, (modeCtx.home && modeCtx.home.scroll) || 0);
+  } else {
+    restoreCtx(to);         // 回到中间层（例如原先展开的自由练习子页），连滚动位置一起还原
+  }
+}
+
+// 只回填输入框内容，不动滚动位置
+// （离开某页时用它，此时页面已隐藏，再滚到它的位置会跟目标页的滚动位置打架）
+function keepInput(mode) {
+  const ctx = modeCtx[mode];
+  if (!ctx || !ctx.text) return;
+  try {
+    if (mode === "view" && inputEl) inputEl.value = ctx.text;
+    else if (mode === "scene" && sceneInputEl) sceneInputEl.value = ctx.text;
+    else if (mode === "tree" && treeInputEl) treeInputEl.value = ctx.text;
+  } catch (e) {}
+}
+
+// 还原某个页面离开时的样子（输入框内容 + 滚动位置），回到该页时调用
+function restoreCtx(mode) {
+  keepInput(mode);
+  const ctx = modeCtx[mode];
+  if (ctx) window.scrollTo(0, ctx.scroll || 0);
+}
+
+// 继续非每日训练：进度已实时落盘，这里只接回练习来源与题型
+// 题型与来源都按快照还原，但题池本身没有落盘 —— 选择题/填空题按来源重新取题，
+// 进度（eng_progress）决定顶栏显示第几题，不会再重复计分
+function resumeCurrentRound() {
+  const snap = resumeSnapshot;
+  if (!snap || !MODE_META[snap.mode] || !MODE_META[snap.mode].topbar) return;
+  // 快照里说的题型就在这一层，别再让 switchMode 自动出一题（会闪一下别的题）
+  activeWrong = !!snap.wrong;
+  activeTagPool = snap.tagPool ? snap.tagPool.slice() : null;
+  suppressAutoload = true;
+  try { switchMode(snap.mode); } finally { suppressAutoload = false; }
+  if (snap.mode === "choice") loadChoiceQuestion();
+  else if (snap.mode === "blank") loadBlankQuestion();
+  else if (snap.mode === "daily") loadDailyQuestion();
+  const idx = Math.min(progress.currentQuestionIndex, progress.totalQuestions || DEFAULT_TOTAL);
+  showToast(idx > 0 ? "已回到第 " + (idx + 1) + " 题，继续加油 💪" : "继续练习");
+}
+
+// 点「返回」的统一入口：进行中先弹确认，确认后再真正离开
+function requestLeave() {
+  if (hasUnsavedRound()) { openNavConfirm(); return; }
+  leavePage();
+}
+
+document.getElementById("navcKeep").addEventListener("click", () => {
+  closeOverlay("navConfirm");   // 继续训练：什么都不做，练习原地保留
+});
+document.getElementById("navcLeave").addEventListener("click", () => {
+  closeOverlay("navConfirm");
+  leavePage();
+});
+// 点弹窗外的遮罩 = 放弃离开（等同于「继续训练」，绝不悄悄丢状态）
+document.getElementById("navConfirm").addEventListener("click", e => {
+  if (e.target && e.target.id === "navConfirm") closeOverlay("navConfirm");
+});
+
+// PageHeader 上的「← 返回」（每个二级页面各一套，行为统一）
+Object.keys(pageHeads).forEach(m => {
+  const head = pageHeads[m];
+  if (!head) return;
+  const backBtn = head.querySelector("[data-back]");
+  if (backBtn) backBtn.addEventListener("click", () => requestLeave());
+});
+
+// 顶部固定条上的「← 返回」（练习中滚动到哪都能点到）
+document.getElementById("tbBack").addEventListener("click", () => requestLeave());
+
+// 一轮的进行状态变化后，同步页内返回键的显隐（0/N 时露出，避免与顶部条重复）
+function syncRoundNav() {
+  showPageHeader(currentScreen);
+}
+
 // ===== 首页：今日训练主卡片 =====
 // 展开/收起「自由练习」模式列表
 function setExploreOpen(open) {
@@ -2913,43 +3340,79 @@ function setExploreOpen(open) {
   explorePanel.hidden = !open;
   toggleExploreBtn.classList.toggle("open", !!open);
   toggleExploreBtn.querySelector("span").textContent = open ? "收起" : "自由练习";
+  if (open) refreshResumeChip();
 }
 toggleExploreBtn.addEventListener("click", () => {
   setExploreOpen(explorePanel.hidden);
 });
 
-// 刷新首页卡片：🔥打卡天数 / 今日进度 / 是否已完成
+// 自由练习里「继续上次练习」入口：只针对非每日训练的题型
+// （今日训练有专门的「继续今日训练」大按钮，这里不重复出现）
+// 这个入口藏在折叠的「自由练习」里，所以有未完成的一轮时主动把面板撑开，
+// 否则用户根本看不到它 —— 那还是等于没做完就找不回来。
+const resumeChip = document.getElementById("resumeChip");
+function refreshResumeChip() {
+  if (!resumeChip) return;
+  const ok = hasPausedRound() && !isResumeDaily();
+  resumeChip.hidden = !ok;
+  if (!ok) return;
+  const label = (MODE_META[resumeSnapshot.mode] || {}).title || "练习";
+  const idx = Math.min(progress.currentQuestionIndex, progress.totalQuestions || DEFAULT_TOTAL);
+  const total = progress.totalQuestions || DEFAULT_TOTAL;
+  resumeChip.textContent = "⏸ 继续「" + label + "」 " + idx + " / " + total + " 题";
+  if (explorePanel && explorePanel.hidden) setExploreOpen(true);
+}
+// 继续非每日训练：进度与题目来源都按快照接回去
+resumeChip.addEventListener("click", () => resumeCurrentRound());
+
+// 刷新首页卡片：🔥打卡天数 / 今日进度 / 是否已完成 / 是否有没做完的一轮
+// 调用方（updateTopBar）已用 homeHero.hidden 保证只在首页调用，这里不再重复判断屏幕，
+// 免得依赖 currentScreen（它是 let，若在初始化前被走到会抛 TDZ 而不是返回 undefined）
 function refreshHome() {
   if (!homeHero) return;
+  const resuming = hasPausedRound() && isResumeDaily();   // 今日训练做到一半就回了首页
+  const rIdx = Math.min(progress.currentQuestionIndex, progress.totalQuestions || DEFAULT_TOTAL);
+  const rTotal = progress.totalQuestions || DEFAULT_TOTAL;
   heroStreakNum.textContent = displayStreak();
   const done = stats.todayDone || 0;
   const goal = DAILY_SIZE;
   const plan = todayPlan();
-  heroSubEl.textContent = isTodayDone()
-    ? "今天已经练完啦，可以再做一组巩固。"
-    : "Day " + plan.day + " · " + plan.title + "　约 10 分钟";
+  heroSubEl.textContent = resuming
+    ? "接着上次的地方继续，约 " + Math.max(rTotal - rIdx, 1) + " 题就练完了。"
+    : (isTodayDone()
+        ? "今天已经练完啦，可以再做一组巩固。"
+        : "Day " + plan.day + " · " + plan.title + "　约 10 分钟");
   heroMetaEl.innerHTML = "";
-  const chips = [
-    "🎯 今日 " + done + "/" + goal + " 题",
-    "🔥 " + displayStreak() + " 天连续",
-    "📕 错题 " + wrongBook.length + " 道"
-  ];
+  // 有未完成的一轮时，把「练到哪了」放在最前面 —— 这是用户最需要看到的信息
+  const chips = [];
+  if (resuming) chips.push("⏸ 今日 " + rIdx + " / " + rTotal + " 题");
+  chips.push("🎯 今日 " + done + "/" + goal + " 题");
+  chips.push("🔥 " + displayStreak() + " 天连续");
+  chips.push("📕 错题 " + wrongBook.length + " 道");
   chips.forEach(txt => {
     const c = document.createElement("span");
     c.className = "hero-chip";
     c.textContent = txt;
     heroMetaEl.appendChild(c);
   });
-  heroStartBtn.textContent = isTodayDone() ? "再练一组" : "开始今日训练";
+  // 按钮：有没做完的一轮 → 「继续今日训练」（绝不从第 1 题重来）
+  heroStartBtn.textContent = resuming
+    ? "继续今日训练"
+    : (isTodayDone() ? "再练一组" : "开始今日训练");
   renderDoneHighlight();
+  refreshResumeChip();
 }
-// 今日已练完时给卡片一个「已完成」样式
+// 今日已练完时给卡片一个「已完成」样式（进行中则给「继续」样式）
 function renderDoneHighlight() {
-  if (heroCardEl) heroCardEl.classList.toggle("done", isTodayDone());
+  if (heroCardEl) {
+    heroCardEl.classList.toggle("done", isTodayDone() && !hasPausedRound());
+    heroCardEl.classList.toggle("resume", hasPausedRound());
+  }
 }
 
-// 开始今日训练：进入每日路径并加载第一题
+// 首页主按钮：没做完 → 从原处继续；否则开一轮新的今日训练
 heroStartBtn.addEventListener("click", () => {
+  if (hasPausedRound() && isResumeDaily()) { resumeDailyRound(); return; }
   startDailyRound();
 });
 
@@ -3016,9 +3479,8 @@ document.getElementById("toggleSettings").addEventListener("click", () => {
 });
 closeSettingsBtn.addEventListener("click", closeSettings);
 settings.addEventListener("click", e => { if (e.target === settings) closeSettings(); });
-document.addEventListener("keydown", e => {
-  if (e.key === "Escape" && settings.classList.contains("open")) closeSettings();
-});
+// Esc 关闭设置统一由下方那一个 keydown 处理（见「作答后的统一收尾」一段），
+// 这里不再单独注册，避免一次 Esc 触发两个监听器。
 
 // Tab 切换：左侧菜单 → 右侧内容
 function switchPane(name) {
@@ -3524,13 +3986,20 @@ document.querySelectorAll("[data-close]").forEach(b => {
 document.querySelectorAll(".overlay").forEach(ov => {
   ov.addEventListener("click", e => { if (e.target === ov) ov.classList.remove("open"); });
 });
+// Esc：统一关掉「当前最上面那一层」——
+// ① 先看通用弹层（错题本 / 每日路径 / 分享 / 完成 / 返回确认…）
+// ② 再看设置弹窗（#settings 不在 .overlay 里，另有自己的开关）
+// 绝不在练习中途直接退出练习 —— 退出练习只能通过显式的返回按钮
 document.addEventListener("keydown", e => {
   if (e.key !== "Escape") return;
-  document.querySelectorAll(".overlay.open").forEach(ov => ov.classList.remove("open"));
+  const open = document.querySelectorAll(".overlay.open");
+  if (open.length) { open[open.length - 1].classList.remove("open"); return; }
+  if (settings.classList.contains("open")) closeSettings();
 });
 
 // 本轮练完的完成面板：展示今日题数 / 正确率 / streak，并提供分享与继续
 function openDone() {
+  clearSnapshot();   // 本轮完成 → 首页按钮回到「开始今日训练」
   const plan = todayPlan();
   const isDaily = CFG.mode === "daily";
   // 每日路径练完一整轮 → 打卡，明天 Day 自动 +1
@@ -3618,6 +4087,12 @@ document.getElementById("doneClose").addEventListener("click", () => {
 document.getElementById("doneShare").addEventListener("click", () => {
   closeOverlay("doneSheet");
   openShare();
+});
+// 完成页的「🏠 返回首页」：本轮已完成，不必再确认，直接走统一出口
+// （这里是弹窗里的措辞，明说"返回首页"，所以留着 🏠 图标；语义与页头的「← 返回」一致）
+document.getElementById("doneHome").addEventListener("click", () => {
+  closeOverlay("doneSheet");
+  leavePage();
 });
 
 // ================= 选择题模式 =================
@@ -4489,13 +4964,41 @@ function renderDayPath() {
   body.appendChild(list);
 }
 function openDayPath() { renderDayPath(); openOverlay("dayPath"); }
-document.getElementById("btnDay").addEventListener("click", openDayPath);
+document.getElementById("btnDay").addEventListener("click", toggleDayPath);
+// 再点一次 📅 就收回列表 —— 不把用户堵在死路里
+function toggleDayPath() {
+  const ov = document.getElementById("dayPath");
+  if (ov.classList.contains("open")) closeOverlay("dayPath");
+  else openDayPath();
+}
 
 // 开始一轮每日练习
 function startDailyRound() {
   switchMode("daily");
   startRound(DAILY_SIZE);
   loadDailyQuestion();
+}
+
+// 继续上次没做完的今日训练：进度 / 统计 / streak 都还在原处（实时落盘），
+// 这里只把练习来源接回去，再按「已答过的题数」把题池消耗到对应位置，
+// 保证不会重头开始、也不会重复计分
+function resumeDailyRound() {
+  const snap = resumeSnapshot;
+  const idx = snap ? Math.min(snap.idx || 0, (snap.total || DAILY_SIZE) - 1) : 0;
+  // 先把题池按原顺序灌好、跳过已答过的题，再切页面：
+  // switchMode("daily") 默认会出一题，那样会先闪一道别的题（题库顺序对不上）
+  dailyInputPool.length = 0;
+  dayPool(todayPlan().day).forEach(s => dailyInputPool.push(s));
+  for (let i = 0; i < idx && dailyInputPool.length; i++) dailyInputPool.shift();
+  activeWrong = false;
+  activeTagPool = null;
+  suppressAutoload = true;
+  try { switchMode("daily"); } finally { suppressAutoload = false; }
+  showPageHeader("daily");     // 返回键显隐要跟「进行中」一致（顶部条已接管）
+  setTopBarVisible(true);
+  updateTopBar();
+  loadDailyQuestion();
+  showToast(idx > 0 ? "已回到第 " + (idx + 1) + " 题，继续加油 💪" : "继续今日训练");
 }
 
 // ================= ⑥ 场景标签面板 =================
@@ -4543,6 +5046,8 @@ function renderTagPicker() {
   body.appendChild(wrap);
 }
 document.getElementById("btnTags").addEventListener("click", () => {
+  const ov = document.getElementById("tagPicker");
+  if (ov.classList.contains("open")) { closeOverlay("tagPicker"); return; }
   renderTagPicker();
   openOverlay("tagPicker");
 });
@@ -4645,7 +5150,11 @@ function openShare() {
   openOverlay("shareBox");
   trackEvent("share_open", shareStats());
 }
-document.getElementById("btnShare").addEventListener("click", openShare);
+document.getElementById("btnShare").addEventListener("click", () => {
+  const ov = document.getElementById("shareBox");
+  if (ov.classList.contains("open")) { closeOverlay("shareBox"); return; }
+  openShare();
+});
 
 // 分享卡下载：把 canvas 转成 PNG 存到本地
 document.getElementById("shareDownload").addEventListener("click", () => {
@@ -4690,6 +5199,12 @@ function init() {
 
   refreshDayIndex();   // 跨天则推进到下一个 Day
   rollDayIfNeeded();   // 跨天则把「今日题数」清零
+  // 跨天处理必须在读续练快照之前：若昨天没做完，今天 dayIndex 已推进，
+  // 旧快照要一并作废，否则「继续训练」会接到上一课
+  const t = todayKey();
+  if (resumeSnapshot && resumeSnapshot.date !== t) clearSnapshot();
+  // 上一轮已经做完（快照残留 / 刷新前刚做完）→ 清掉，首页按钮保持「开始今日训练」
+  if (resumeSnapshot && isRoundDone()) clearSnapshot();
   updateTopBar();      // 同步顶部进度条 / 🔥streak / 错题角标
 
   // 默认落在首页（今日训练大卡片），让用户「不思考 → 直接开始练」；
